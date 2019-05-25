@@ -85,7 +85,7 @@ void terminal_putentryat(char c, uint8_t color, size_t x, size_t y)
  
 void terminal_putchar(char c) 
 {
-
+	/*check for newline*/
 	if(c == '\n') {
 		++terminal_row;
 		terminal_column = 0;
@@ -115,6 +115,5 @@ void kernel_main(void)
 	/* Initialize terminal interface */
 	terminal_initialize();
  
-	/* Newline support is left as an exercise. */
 	terminal_writestring("wOS v0.1\nHello, kernel World!\n");
 }
