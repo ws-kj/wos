@@ -36,6 +36,14 @@ gdt_flush:
 flush2:
 	ret   
 
+#load idt 
+.global idt_load
+.type idt_load, @function
+.global idtp
+idt_load:
+	lidt (idtp)
+	ret
+
 #kernel entry point
 .global _start
 .type _start, @function
