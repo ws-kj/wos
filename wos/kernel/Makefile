@@ -34,6 +34,7 @@ kernel/kernel.o \
 OBJS=\
 $(ARCHDIR)/gdt.o \
 $(ARCHDIR)/idt.o \
+$(ARCHDIR)/isrs.o \
 $(ARCHDIR)/crti.o \
 $(ARCHDIR)/crtbegin.o \
 $(KERNEL_OBJS) \
@@ -44,6 +45,7 @@ LINK_LIST=\
 $(LDFLAGS) \
 $(ARCHDIR)/gdt.o \
 $(ARCHDIR)/idt.o \
+$(ARCHDIR)/isrs.o \
 $(ARCHDIR)/crti.o \
 $(ARCHDIR)/crtbegin.o \
 $(KERNEL_OBJS) \

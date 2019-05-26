@@ -101,161 +101,188 @@ idt_load:
 
 isr0:
 	cli
-	push 	$0, byte
-	push	$0, byte
+	push 	$0 
+	push	$0 
 	jmp 	isr_common_stub
 isr1:
 	cli
-	push 	$0, byte
-	push	$1, byte
+	push 	$0 
+	push	$1 
 	jmp 	isr_common_stub
 isr2:
 	cli
-	push 	$0, byte
-	push	$2, byte
+	push 	$0 
+	push	$2 
+	jmp 	isr_common_stub
+isr3:
+	cli
+	push 	$0 
+	push	$3 
 	jmp 	isr_common_stub
 isr4:
 	cli
-	push 	$0, byte
-	push	$3, byte
+	push 	$0 
+	push	$4 
 	jmp 	isr_common_stub
 isr5:
 	cli
-	push 	$0, byte
-	push	$4, byte
+	push 	$0 
+	push	$5 
 	jmp 	isr_common_stub
 isr6:
 	cli
-	push 	$0, byte
-	push	$5, byte
+	push 	$0 
+	push	$6 
 	jmp 	isr_common_stub
 isr7:
 	cli
-	push 	$0, byte
-	push	$6, byte
+	push 	$0 
+	push	$7 
 	jmp 	isr_common_stub
 isr8:
 	cli
-	push 	$0, byte
-	push	$7, byte
+	push 	$0 
+	push	$8 
 	jmp 	isr_common_stub
 isr9:
 	cli
-	push 	$0, byte
-	push	$8, byte
+	push 	$0 
+	push	$9 
 	jmp 	isr_common_stub
 isr10:
 	cli
-	push 	$0, byte
-	push	$9, byte
+	push 	$0 
+	push	$10 
 	jmp 	isr_common_stub
 isr11:
 	cli
-	push 	$0, byte
-	push	$10, byte
+	push 	$0 
+	push	$11 
 	jmp 	isr_common_stub
 isr12:
 	cli
-	push 	$0, byte
-	push	$11, byte
+	push 	$0 
+	push	$12 
 	jmp 	isr_common_stub
 isr13:
 	cli
-	push 	$0, byte
-	push	$12, byte
+	push 	$0 
+	push	$13 
 	jmp 	isr_common_stub
 isr14:
 	cli
-	push 	$0, byte
-	push	$13, byte
+	push 	$0 
+	push	$14 
 	jmp 	isr_common_stub
 isr15:
 	cli
-	push 	$0, byte
-	push	$14, byte
+	push 	$0 
+	push	$15 
 	jmp 	isr_common_stub
 isr16:
 	cli
-	push 	$0, byte
-	push	$15, byte
+	push 	$0 
+	push	$16 
 	jmp 	isr_common_stub
 isr17:
 	cli
-	push 	$0, byte
-	push	$16, byte
+	push 	$0 
+	push	$17 
 	jmp 	isr_common_stub
 isr18:
 	cli
-	push 	$0, byte
-	push	$17, byte
-	jmp 	isr_common_stub
-isr18:
-	cli
-	push 	$0, byte
-	push	$18, byte
+	push 	$0 
+	push	$18 
 	jmp 	isr_common_stub
 isr19:
 	cli
-	push 	$0, byte
-	push	$19, byte
+	push 	$0 
+	push	$19 
 	jmp 	isr_common_stub
 isr20:
 	cli
-	push 	$0, byte
-	push	$20, byte
+	push 	$0 
+	push	$20 
 	jmp 	isr_common_stub
 isr21:
 	cli
-	push 	$0, byte
-	push	$21, byte
+	push 	$0 
+	push	$21 
 	jmp 	isr_common_stub
 isr22:
 	cli
-	push 	$0, byte
-	push	$22, byte
+	push 	$0 
+	push	$22 
 	jmp 	isr_common_stub
 isr23:
 	cli
-	push 	$0, byte
-	push	$23, byte
+	push 	$0 
+	push	$23 
 	jmp 	isr_common_stub
 isr24:
 	cli
-	push 	$0, byte
-	push	$24, byte
+	push 	$0 
+	push	$24 
 	jmp 	isr_common_stub
 isr25:
 	cli
-	push 	$0, byte
-	push	$25, byte
+	push 	$0 
+	push	$25 
 	jmp 	isr_common_stub
 isr26:
 	cli
-	push 	$0, byte
-	push	$26, byte
+	push 	$0 
+	push	$26 
 	jmp 	isr_common_stub
 isr27:
 	cli
-	push 	$0, byte
-	push	$27, byte
+	push 	$0 
+	push	$27 
 	jmp 	isr_common_stub
 isr28:
 	cli
-	push 	$0, byte
-	push	$28, byte
+	push 	$0 
+	push	$28 
 	jmp 	isr_common_stub
 isr29:
 	cli
-	push 	$0, byte
-	push	$29, byte
+	push 	$0 
+	push	$29 
 	jmp 	isr_common_stub
 isr30:
 	cli
-	push 	$0, byte
-	push	$30, byte
+	push 	$0 
+	push	$30 
 	jmp 	isr_common_stub
 isr31:
 	cli
-	push	$0, byte
-	push	$31, byte
+	push	$0 
+	push	$31 
 	jmp 	isr_common_stub
+
+.extern fault_handler
+.type fault_handler @function
+#common stub. Saves processor state, sests up kernel mode sgments, calls fault hander, and restores stack frame.
+isr_common_stub:
+	pusha
+	push 	%ds
+	push	%es
+	push	%fs
+	push	%gs
+	mov	$0x10, %ax
+	mov	%ax,  %ds
+	mov	%ax,  %es
+	mov	%ax,  %fs
+	mov	%ax,  %gs
+	mov	%esp, %eax
+	push	%eax
+	mov	(fault_handler), %eax
+	call	%eax
+	pop	%eax
+	pop	%gs
+	pop	%fs
+	pop	%es
+	pop	%ds
+	popa
+	add	$8, %esp
+	iret
