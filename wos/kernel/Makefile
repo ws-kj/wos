@@ -35,6 +35,8 @@ OBJS=\
 $(ARCHDIR)/gdt.o \
 $(ARCHDIR)/idt.o \
 $(ARCHDIR)/isrs.o \
+$(ARCHDIR)/irq.o \
+$(ARCHDIR)/util.o \
 $(ARCHDIR)/crti.o \
 $(ARCHDIR)/crtbegin.o \
 $(KERNEL_OBJS) \
@@ -46,6 +48,8 @@ $(LDFLAGS) \
 $(ARCHDIR)/gdt.o \
 $(ARCHDIR)/idt.o \
 $(ARCHDIR)/isrs.o \
+$(ARCHDIR)/irq.o \
+$(ARCHDIR)/util.o \
 $(ARCHDIR)/crti.o \
 $(ARCHDIR)/crtbegin.o \
 $(KERNEL_OBJS) \
