@@ -11,8 +11,8 @@ void kernel_main(void) {
 	isrs_install();
 	terminal_initialize();
 
-	printf("wos v0.1\n");
-	printf("Hello, kernel World!\n");
+	printf("wos v0.01\n");
+	printf("WARNING: This system is not stable.\n");
+	printf("Hello, World!\n\n");
 	//test exception
-	printf("%d", (1/0));
 }

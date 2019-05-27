@@ -138,8 +138,9 @@ extern void fault_handler(struct regs *r)
 {
     if (r->int_no < 32)
     {
-        printf(exception_messages[r->int_no]);
-        printf(" Exception. System Halted!\n");
+	terminal_writestring("\nException: ");
+        terminal_writestring(exception_messages[r->int_no]);
+        terminal_writestring("\nSystem Halted!\n");
         for (;;);
     }
 }
