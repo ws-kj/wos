@@ -20,4 +20,5 @@ void kernel_main(void) {
 	printf("WARNING: This system is not stable.\n");
 	printf("Hello, World!\n\n");
 	//test exception
+	terminal_putchar((1/0) + '0');
 }

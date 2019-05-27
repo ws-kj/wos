@@ -37,6 +37,7 @@ $(ARCHDIR)/idt.o \
 $(ARCHDIR)/isrs.o \
 $(ARCHDIR)/irq.o \
 $(ARCHDIR)/util.o \
+$(ARCHDIR)/kb.o \
 $(ARCHDIR)/crti.o \
 $(ARCHDIR)/crtbegin.o \
 $(KERNEL_OBJS) \
@@ -50,6 +51,7 @@ $(ARCHDIR)/idt.o \
 $(ARCHDIR)/isrs.o \
 $(ARCHDIR)/irq.o \
 $(ARCHDIR)/util.o \
+$(ARCHDIR)/kb.o \
 $(ARCHDIR)/crti.o \
 $(ARCHDIR)/crtbegin.o \
 $(KERNEL_OBJS) \
