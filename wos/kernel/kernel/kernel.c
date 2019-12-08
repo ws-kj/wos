@@ -5,6 +5,7 @@
 #include <kernel/idt.h>
 #include <kernel/isrs.h>
 #include <kernel/irq.h>
+#include <kernel/timer.h>
 
 void kernel_main(void) {
 	gdt_install();
@@ -13,6 +14,8 @@ void kernel_main(void) {
 
 	irq_install();
 	__asm__ __volatile__("sti");
+
+	timer_install();
 
 	terminal_initialize();
 

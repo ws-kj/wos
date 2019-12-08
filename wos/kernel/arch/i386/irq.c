@@ -1,7 +1,7 @@
+#include <kernel/idt.h>
 #include <kernel/irq.h>
 #include <kernel/isrs.h>
 #include <kernel/util.h>
-#include <kernel/idt.h>
 /* These are own ISRs that point to our special IRQ handler
 *  instead of the regular 'fault_handler' function */
 extern void irq0();
