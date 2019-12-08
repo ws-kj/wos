@@ -1,2 +1,1 @@
-# wos
-wOS is a 32bit hobby operation system.
+wos is a 32bit hobby operating system.
