@@ -11,13 +11,14 @@ void kernel_main(void) {
 	gdt_install();
 	idt_install();
 	isrs_install();
-	timer_install();
 	irq_install();
 	__asm__ __volatile__("sti");
 	terminal_initialize();
+	timer_install();
 
 	printf("wos v0.01\n");
-	timer_wait(18);
+	wait(18 * 5);
 	printf("WARNING: This system is not stable.\n");
+
 	for(;;);
 }

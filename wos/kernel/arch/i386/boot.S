@@ -40,7 +40,6 @@ _start:
 .size _start, . - _start
 
 
-.section .data
 #setup gdt
 .global gdt_flush     # Allows the C code to link to this
 .type gdt_flush, @function
