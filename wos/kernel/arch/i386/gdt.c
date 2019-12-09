@@ -1,4 +1,5 @@
 #include <kernel/gdt.h>
+#include <kernel/tty.h>
 
 /* Defines a GDT entry */
 struct gdt_entry
@@ -70,4 +71,5 @@ void gdt_install()
 
     /* Flush out the old GDT and install the new changes! */
     gdt_flush();
+    printf("Installed GDT\n");
 }

@@ -5,7 +5,6 @@
 #include <kernel/idt.h>
 #include <kernel/isrs.h>
 #include <kernel/irq.h>
-#include <kernel/timer.h>
 
 void kernel_main(void) {
 	gdt_install();
@@ -14,10 +13,8 @@ void kernel_main(void) {
 	irq_install();
 	__asm__ __volatile__("sti");
 	terminal_initialize();
-	timer_install();
 
 	printf("wos v0.01\n");
-	wait(18 * 5);
 	printf("WARNING: This system is not stable.\n");
 
 	for(;;);
