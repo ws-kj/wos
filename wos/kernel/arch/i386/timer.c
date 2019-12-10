@@ -10,6 +10,7 @@ void timer_handler(struct regs *r) {
 	if (timer_ticks % 18 == 0) {
 		printf(1/0);
 	}
+	printf("yee\n");
 }
 
 void wait(int ticks) {

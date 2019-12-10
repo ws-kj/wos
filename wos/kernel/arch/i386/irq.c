@@ -33,6 +33,7 @@ void *irq_routines[16] =
 /* This installs a custom IRQ handler for the given IRQ */
 void irq_install_handler(int irq, void (*handler)(struct regs *r)) {
     irq_routines[irq] = handler;
+    printf("Installed IRQ\n");
 }
 
 /* This clears the handler for a given IRQ */
@@ -103,6 +104,7 @@ void irq_handler(struct regs *r)
     /* This is a blank function pointer */
     void (*handler)(struct regs *r);
 
+    printf("ye\n");
     /* Find out if we have a custom handler to run for this
     *  IRQ, and then finally, run it */
     handler = irq_routines[r->int_no - 32];
