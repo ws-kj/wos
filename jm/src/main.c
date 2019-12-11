@@ -5,5 +5,5 @@
 int kernel_main(struct multiboot *mboot_ptr) {
 	init_descriptor_tables();
 	monitor_clear();
-	monitor_write("Hello, world!");
+	monitor_write("wos v0.01\n");
 }
