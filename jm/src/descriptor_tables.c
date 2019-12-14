@@ -68,6 +68,7 @@ static void init_idt()
 	outb(0x21, 0x0);
 	outb(0xA1, 0x0);
 
+
 	idt_ptr.limit = sizeof(idt_entry_t) * 256 -1;
 	idt_ptr.base  = (uint32_t)&idt_entries;
 
@@ -123,6 +124,7 @@ static void init_idt()
 	idt_set_gate( 47, (uint32_t)irq15, 0x08, 0x8E);
 
 	idt_flush((uint32_t)&idt_ptr);
+	__asm__ __volatile__ ("sti");
 }
 
 static void idt_set_gate(uint8_t num, uint32_t base, uint16_t sel, uint8_t flags)

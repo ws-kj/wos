@@ -62,6 +62,7 @@ void irq_remap(void)
     outportb(0xA1, 0x01);
     outportb(0x21, 0x0);
     outportb(0xA1, 0x0);
+    __asm__ __volatile__ ("hlt");
 }
 
 /* We first remap the interrupt controllers, and then we install
