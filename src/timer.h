@@ -8,4 +8,6 @@
 
 void init_timer(uint32_t frequency);
 
+void timer_wait(uint32_t ticks);
+
 #endif

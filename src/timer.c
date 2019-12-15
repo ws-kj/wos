@@ -10,9 +10,14 @@ volatile uint32_t tick = 0;
 static void timer_callback(registers_t regs)
 {
    tick++;
-   monitor_write("Tick: ");
-   monitor_write_dec(tick);
-   monitor_write("\n");
+}
+
+void timer_wait(uint32_t ticks) {
+	uint32_t eticks;
+	eticks = tick + ticks;
+	while(tick < eticks) {
+		__asm__ __volatile__ ("sti//hlt/cli");
+	}
 }
 
 void init_timer(uint32_t frequency)
