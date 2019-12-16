@@ -107,7 +107,7 @@ void free_frame(page_t *page)
    }
 } 
 
-void initialise_paging()
+void init_paging()
 {
    // The size of physical memory. For the moment we
    // assume it is 16MB big.

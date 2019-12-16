@@ -8,7 +8,7 @@
 int kernel_main(struct multiboot *mboot_ptr) {
 	init_descriptor_tables();
 	monitor_clear();
-	initialise_paging();
+	init_paging();
 	init_timer(50);
 	init_keyboard();
 
