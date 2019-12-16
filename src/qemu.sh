@@ -1,6 +1,6 @@
 
 
-cp kernel.bin isodir/boot/kernel.bin  
-grub-mkrescue -o kernel.iso isodir
-qemu-system-i386 kernel.iso
+cp wos.bin isodir/boot/wos.bin  
+grub-mkrescue -o wos.iso isodir
+qemu-system-i386 wos.iso
 

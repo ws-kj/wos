@@ -3,16 +3,24 @@
 #include "descriptor_tables.h"
 #include "timer.h"
 #include "keyboard.h"
+#include "paging.h"
 
 int kernel_main(struct multiboot *mboot_ptr) {
 	init_descriptor_tables();
+	monitor_clear();
+	initialise_paging();
 	init_timer(50);
 	init_keyboard();
-	monitor_clear();
+
 	monitor_write("wos v0.01\n");
 
-	for(;;) {
+	uint32_t *ptr = (uint32_t*)0xA0000000;
+   	uint32_t do_page_fault = *ptr;
+
+	return 0;
+
+	/*for(;;) {
     		__asm__ __volatile__("hlt");
- 	}
+ 	}*/
 
 }
