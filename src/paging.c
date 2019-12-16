@@ -109,7 +109,6 @@ void free_frame(page_t *page)
 
 void initialise_paging()
 {
-   monitor_write("[Init] Paging... ");
    // The size of physical memory. For the moment we
    // assume it is 16MB big.
    uint32_t mem_end_page = 0x1000000;
@@ -143,7 +142,6 @@ void initialise_paging()
    // Now, enable paging!
    switch_page_directory(kernel_directory);
 	
-   monitor_write("Done.\n");
 }
 
 void switch_page_directory(page_directory_t *dir)
@@ -155,12 +153,15 @@ void switch_page_directory(page_directory_t *dir)
    cr0 |= 0x80000000; // Enable paging!
    asm volatile("mov %0, %%cr0":: "r"(cr0));
 
-   monitor_write("\nSwitched page directory to ");
+   monitor_color(7, 0);
+   monitor_write("Switched page directory to ");
    monitor_write_dec(&dir);
 
    monitor_write("\ncr0: ");
    monitor_write_hex(cr0);
    monitor_put('\n');
+
+   monitor_color(15, 0);
 
 }
 

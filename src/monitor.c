@@ -11,6 +11,9 @@ uint16_t *video_memory = (uint16_t *)0xB8000;
 uint8_t cursor_x = 0;
 uint8_t cursor_y = 0;
 
+//color attrib
+uint8_t attributeByte = (0 /*black*/ << 4) | (15 /*white*/ & 0x0F);
+
 // Updates the hardware cursor.
 static void move_cursor()
 {
@@ -26,8 +29,6 @@ static void move_cursor()
 static void scroll()
 {
 
-    // Get a space character with the default colour attributes.
-    uint8_t attributeByte = (0 /*black*/ << 4) | (15 /*white*/ & 0x0F);
     uint16_t blank = 0x20 /* space */ | (attributeByte << 8);
 
     // Row 25 is the end, this means we need to scroll up
@@ -59,9 +60,6 @@ void monitor_put(char c)
     uint8_t backColour = 0;
     uint8_t foreColour = 15;
 
-    // The attribute byte is made up of two nibbles - the lower being the 
-    // foreground colour, and the upper the background colour.
-    uint8_t  attributeByte = (backColour << 4) | (foreColour & 0x0F);
     // The attribute byte is the top 8 bits of the word we have to send to the
     // VGA board.
     uint16_t attribute = attributeByte << 8;
@@ -118,8 +116,6 @@ void monitor_put(char c)
 // Clears the screen, by copying lots of spaces to the framebuffer.
 void monitor_clear()
 {
-    // Make an attribute byte for the default colours
-    uint8_t attributeByte = (0 /*black*/ << 4) | (15 /*white*/ & 0x0F);
     uint16_t blank = 0x20 /* space */ | (attributeByte << 8);
 
     int i;
@@ -132,6 +128,10 @@ void monitor_clear()
     cursor_x = 0;
     cursor_y = 0;
     move_cursor();
+}
+
+void monitor_color(unsigned char forecolor, unsigned char backcolor) {
+	attributeByte = (backcolor <<4) | (forecolor & 0x0F);
 }
 
 // Outputs a null-terminated ASCII string to the monitor.

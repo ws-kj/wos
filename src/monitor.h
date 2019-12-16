@@ -9,6 +9,8 @@ void monitor_clear();
 
 void monitor_write(char *c);
 
+void monitor_color(unsigned char forecolor, unsigned char backcolor);
+
 void monitor_write_dec(uint32_t n);
 
 void monitor_write_hex(uint32_t n);
