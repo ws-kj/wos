@@ -14,13 +14,8 @@ int kernel_main(struct multiboot *mboot_ptr) {
 
 	monitor_write("wos v0.01\n");
 
-	uint32_t *ptr = (uint32_t*)0xA0000000;
-   	uint32_t do_page_fault = *ptr;
-
-	return 0;
-
-	/*for(;;) {
+	for(;;) {
     		__asm__ __volatile__("hlt");
- 	}*/
+ 	}
 
 }
