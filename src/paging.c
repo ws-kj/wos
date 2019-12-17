@@ -156,9 +156,6 @@ void switch_page_directory(page_directory_t *dir)
    monitor_color(7, 0);
    monitor_write("Switched page directory to ");
    monitor_write_dec(&dir);
-
-   monitor_write("\ncr0: ");
-   monitor_write_hex(cr0);
    monitor_put('\n');
 
    monitor_color(15, 0);
