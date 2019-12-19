@@ -1,3 +1,4 @@
+
 #include "paging.h"
 #include "common.h"
 #include "monitor.h"
@@ -15,6 +16,7 @@ uint32_t nframes;
 
 // Defined in kheap.c
 extern uint32_t placement_address;
+extern heap_t *kheap;
 
 // Macros used in the bitset algorithms.
 #define INDEX_FROM_BIT(a) (a/(8*4))
@@ -122,6 +124,10 @@ void init_paging()
    memset(kernel_directory, 0, sizeof(page_directory_t));
    current_directory = kernel_directory;
 
+   int i = 0;
+   for (i = KHEAP_START; i < KHEAP_START+KHEAP_INITIAL_SIZE; i += 0x1000)
+       get_page(i, 1, kernel_directory); 
+
    // We need to identity map (phys addr = virt addr) from
    // 0x0 to the end of used memory, so we can access this
    // transparently, as if paging wasn't enabled.
@@ -129,19 +135,25 @@ void init_paging()
    // inside the loop body we actually change placement_address
    // by calling kmalloc(). A while loop causes this to be
    // computed on-the-fly rather than once at the start.
-   int i = 0;
+   i = 0;
    while (i < placement_address)
    {
        // Kernel code is readable but not writeable from userspace.
        alloc_frame( get_page(i, 1, kernel_directory), 0, 0);
        i += 0x1000;
    }
+
+   for (i = KHEAP_START; i < KHEAP_START+KHEAP_INITIAL_SIZE; i += 0x1000)
+       alloc_frame( get_page(i, 1, kernel_directory), 0, 0);
+
    // Before we enable paging, we must register our page fault handler.
    register_interrupt_handler(14, page_fault);
 
    // Now, enable paging!
    switch_page_directory(kernel_directory);
-	
+
+   kheap = create_heap(KHEAP_START, KHEAP_START+KHEAP_INITIAL_SIZE, 0xCFFFF000, 0, 0);
+
 }
 
 void switch_page_directory(page_directory_t *dir)

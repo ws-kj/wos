@@ -15,6 +15,7 @@ typedef struct page
    uint32_t frame      : 20;  // Frame address (shifted right 12 bits)
 } page_t;
 
+
 typedef struct page_table
 {
    page_t pages[1024];
@@ -39,10 +40,10 @@ typedef struct page_directory
    uint32_t physicalAddr;
 } page_directory_t;
 
-/**
-  Sets up the environment, page directories etc and
-  enables paging.
-**/
+void alloc_frame(page_t *page, int is_kernel, int is_writeable);
+
+void free_frame(page_t *page);
+
 void init_paging();
 
 /**

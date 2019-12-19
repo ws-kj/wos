@@ -1,4 +1,5 @@
 #include "common.h"
+#include "monitor.h"
 #include <stdint.h>
 
 void outb(uint16_t port, uint8_t value) {
@@ -81,3 +82,18 @@ char *strcat(char *dest, const char *src)
     while (*src != 0);
     return dest;
 }
+
+/* assert */
+void assert(int o, int line, char* file) {
+	if(o != 0) {
+		monitor_color(4, 0);
+		monitor_write("ASSERT failed in ");
+		monitor_write(file);
+		monitor_write(", line ");
+		monitor_write_dec(line);
+		monitor_put('\n');
+		monitor_color(15, 0);
+	}
+}
+
+
