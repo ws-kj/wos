@@ -96,4 +96,12 @@ void assert(int o, int line, char* file) {
 	}
 }
 
-
+/*kernel panic */
+void panic(char* msg) {
+	monitor_color(4, 0);
+	monitor_write("KERNEL PANIC: ");
+	monitor_write(msg);
+	monitor_write("\n");
+	monitor_color(15, 0);
+	for (;;) {};
+}

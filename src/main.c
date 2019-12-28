@@ -17,20 +17,6 @@ int kernel_main(struct multiboot *mboot_ptr) {
 
 	monitor_write("wos v0.01\n");
 
-	uint32_t b = kmalloc(8);
-	uint32_t c = kmalloc( 8);
-	monitor_write("a: ");
-	monitor_write_hex(a);
-	monitor_write("b: ");
-	monitor_write_hex(b);
-	monitor_write("\nc: ");
-	monitor_write_hex(c);
-	kfree(c);
-	kfree(b);
-	uint32_t d = kmalloc(12);
-	monitor_write(", d: ");
-	monitor_write_hex(d); 
-
 	for(;;) {
     		__asm__ __volatile__("hlt");
  	}
