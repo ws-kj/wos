@@ -85,7 +85,7 @@ char *strcat(char *dest, const char *src)
 
 /* assert */
 void assert(int o, int line, char* file) {
-	if(o != 0) {
+	if(o != 1) {
 		monitor_color(4, 0);
 		monitor_write("ASSERT failed in ");
 		monitor_write(file);
