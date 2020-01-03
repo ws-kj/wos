@@ -1,0 +1,41 @@
+[package]
+name = "os"
+version = "0.1.0"
+authors = ["Will Savage <wsavage6316@gmail.com>"]
+edition = "2018"
+
+
+[dependencies]
+volatile = "0.2.6"
+spin = "0.5.2"
+x86_64 = "0.8.1"
+uart_16550 = "0.2.0"
+pic8259_simple = "0.1.1"
+pc-keyboard = "0.3.1"
+linked_list_allocator = "0.6.4"
+
+[dependencies.bootloader]
+version = "0.8.0"
+features = ['map_physical_memory']
+
+[dependencies.lazy_static]
+version = "1.0"
+features = ["spin_no_std"]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+
+[package.metadata.bootimage]
+test-args = ["-device", "isa-debug-exit,iobase=0xf4,iosize=0x04", "-serial", "stdio", "-display", "none"]
+test-success-exit-code = 33
+
+[[test]]
+name = "should_panic"
+harness = false
+
+[[test]]
+name = "stack_overflow"
+harness = false
