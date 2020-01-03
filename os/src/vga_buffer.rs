@@ -2,6 +2,7 @@ use volatile::Volatile;
 use core::fmt;
 use lazy_static::lazy_static;
 use spin::Mutex;
+use crate::io;
 
 #[macro_export]
 macro_rules! print {
@@ -72,7 +73,8 @@ struct Buffer {
 }
 
 pub struct Writer {
-    column_position: usize,
+    cursor_x: usize,
+    cursor_y: usize,
     color_code: ColorCode,
     buffer: &'static mut Buffer,
 }
@@ -82,32 +84,39 @@ impl Writer {
         match byte {
             b'\n' => self.new_line(),
             byte => {
-                if self.column_position >= BUFFER_WIDTH {
+                if self.cursor_x >= BUFFER_WIDTH {
                     self.new_line();
                 }
 
-                let row = BUFFER_HEIGHT - 1;
-                let col = self.column_position;
+                let row = self.cursor_y;
+                let col = self.cursor_x;
 
                 let color_code = self.color_code;
                 self.buffer.chars[row][col].write(ScreenChar {
                     ascii_character: byte,
                     color_code,
                 });
-                self.column_position += 1;
+                self.cursor_x += 1;
+
+                self.set_cursor();
             }
         }
     }
 
     fn new_line(&mut self) {
-        for row in 1..BUFFER_HEIGHT {
-            for col in 0..BUFFER_WIDTH {
-                let character = self.buffer.chars[row][col].read();
-                self.buffer.chars[row - 1][col].write(character);
+        self.cursor_x = 0;
+        if self.cursor_y >= BUFFER_HEIGHT - 1 {
+            for row in 1..BUFFER_HEIGHT {
+                for col in 0..BUFFER_WIDTH {
+                    let character = self.buffer.chars[row][col].read();
+                    self.buffer.chars[row - 1][col].write(character);
+                }
             }
+            self.clear_row(BUFFER_HEIGHT - 1);
+        } else {
+            self.cursor_y += 1;
         }
-        self.clear_row(BUFFER_HEIGHT - 1);
-        self.column_position = 0;
+        self.set_cursor();
     }
 
     fn clear_row(&mut self, row:usize) {
@@ -124,6 +133,7 @@ impl Writer {
         for row in 1..BUFFER_HEIGHT {
             self.clear_row(row);
         }
+        self.set_cursor();
     }
 
     pub fn write_string(&mut self, s: &str) {
@@ -132,6 +142,16 @@ impl Writer {
                 0x20..=0x7e | b'\n' => self.write_byte(byte),
                 _ => self.write_byte(0xfe),
             }
+        }
+    }
+
+    fn set_cursor(&mut self) {
+        let cursor_loc = (self.cursor_y * 80 + self.cursor_x) as u16;
+        unsafe {
+            io::outw(0x3D4, 14);
+            io::outw(0x3D5, cursor_loc >> 8);
+            io::outw(0x3D4, 15);
+            io::outw(0x3D5, cursor_loc);
         }
     }
 }
@@ -145,11 +165,13 @@ impl fmt::Write for Writer {
 
 lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
-        column_position: 0,
+        cursor_x: 0,
+        cursor_y: 0,
         color_code: ColorCode::new(Color::White, Color::Black),
         buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
     });
 }
+
 
 // -----TESTS-----
 
