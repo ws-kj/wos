@@ -5,6 +5,7 @@ use spin::Mutex;
 use alloc::string::{String, ToString};
 use crate::print;
 use alloc::{vec::Vec};
+use crate::vga_buffer;
 
 pub enum InputType {
     Line,
@@ -54,6 +55,25 @@ impl InputBuffer {
                     }
                 }
             }
+        }
+    }
+
+    pub fn check_writable(&mut self, character: char) -> bool {
+        if self.open {
+            match character {
+                '\x08' => {
+                    if self.buffer.len() > 0 {
+                        vga_buffer::WRITER.lock().backspace();
+                        let mut t = self.get_buffer();
+                        t = (&t[0..self.get_buffer().len()-1]).to_string();
+                        self.buffer = t;
+                    }
+                    false
+                },
+                character => true,
+            }
+        } else {
+            false
         }
     }
 

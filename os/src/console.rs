@@ -28,9 +28,13 @@ impl Console {
     }
 
     pub fn process_command(&mut self, com: String) {
-        let args: Vec<String> = com.split_whitespace().map(|s| s.to_string()).collect();
-        commands::get_command(args.first().unwrap().to_string(), args); 
-        self.prompt();
+        if com == String::from("\n") {
+            self.prompt();
+        } else {
+            let args: Vec<String> = com.split_whitespace().map(|s| s.to_string()).collect();
+            commands::get_command(args.first().unwrap().to_string(), args); 
+            self.prompt();
+        }
     }
 }
 

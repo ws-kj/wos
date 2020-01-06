@@ -80,9 +80,26 @@ pub struct Writer {
 }
 
 impl Writer {
+    pub fn backspace(&mut self) {
+        self.move_cursor(self.cursor_x - 1, self.cursor_y);
+        let color_code = self.color_code;
+        self.buffer.chars[self.cursor_y][self.cursor_x].write(ScreenChar {
+            ascii_character: b' ',
+            color_code,
+        });
+    }
+
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
+            b'\x08' => {
+                self.move_cursor(self.cursor_x - 1, self.cursor_y);
+                let color_code = self.color_code;
+                self.buffer.chars[self.cursor_y][self.cursor_x].write(ScreenChar {
+                    ascii_character: b' ',
+                    color_code,
+                });
+            },
             byte => {
                 if self.cursor_x >= BUFFER_WIDTH {
                     self.new_line();
@@ -98,7 +115,7 @@ impl Writer {
                 });
                 self.cursor_x += 1;
 
-                self.move_cursor();
+                self.move_cursor(self.cursor_x, self.cursor_y);
             }
         }
     }
@@ -116,7 +133,7 @@ impl Writer {
         } else {
             self.cursor_y += 1;
         }
-        self.move_cursor();
+        self.move_cursor(self.cursor_x, self.cursor_y);
     }
 
     fn clear_row(&mut self, row:usize) {
@@ -133,9 +150,7 @@ impl Writer {
         for row in 0..BUFFER_HEIGHT {
             self.clear_row(row);
         }
-        self.cursor_y = 0;
-        self.cursor_x = 0;
-        self.move_cursor();
+        self.move_cursor(0, 0);
     }
 
     pub fn write_string(&mut self, s: &str) {
@@ -147,7 +162,9 @@ impl Writer {
         }
     }
 
-    fn move_cursor(&mut self) {
+    fn move_cursor(&mut self, x: usize, y: usize) {
+        self.cursor_x = x;
+        self.cursor_y = y;
         let cursor_loc = (self.cursor_y * 80 + self.cursor_x) as u16;
         unsafe {
             io::outw(0x3D4, 14);

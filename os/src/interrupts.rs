@@ -5,6 +5,7 @@ use crate::gdt;
 use pic8259_simple::ChainedPics;
 use spin;
 use crate::stdin;
+use crate::vga_buffer;
 
 pub const PIC_1_OFFSET: u8 = 32;
 pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
@@ -81,7 +82,7 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(
     _stack_frame: &mut InterruptStackFrame)
 {
     use x86_64::instructions::port::Port;
-    use pc_keyboard::{Keyboard, ScancodeSet1, DecodedKey, layouts};
+    use pc_keyboard::{Keyboard, ScancodeSet1, KeyCode, DecodedKey, layouts};
     use spin::Mutex;
 
     lazy_static! {
@@ -95,8 +96,16 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(
     if let Ok(Some(key_event)) = keyboard.add_byte(scancode){
         if let Some(key) = keyboard.process_keyevent(key_event) {
             match key {
-                DecodedKey::Unicode(character) => stdin::BUF.lock().write_char(character),
-                DecodedKey::RawKey(key) => print!(""),
+                DecodedKey::Unicode(character) => {
+                    if stdin::BUF.lock().check_writable(character) {
+                        stdin::BUF.lock().write_char(character); 
+                    }
+                },
+                DecodedKey::RawKey(key) => {
+                    if key == KeyCode::Backspace {
+                        print!("d");
+                    }
+                },
             }
         }
     }
