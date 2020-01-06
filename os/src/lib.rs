@@ -5,6 +5,7 @@
 #![reexport_test_harness_main = "test_main"]
 #![feature(abi_x86_interrupt)]
 #![feature(alloc_error_handler)]
+#![feature(vec_remove_item)]
 #![feature(asm)]
 
 extern crate alloc;
@@ -19,6 +20,9 @@ pub mod gdt;
 pub mod memory;
 pub mod allocator;
 pub mod io;
+pub mod stdin;
+pub mod console;
+pub mod commands;
 
 #[global_allocator]
 static ALLOCATOR: LockedHeap = LockedHeap::empty();

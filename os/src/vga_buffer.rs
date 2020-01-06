@@ -98,7 +98,7 @@ impl Writer {
                 });
                 self.cursor_x += 1;
 
-                self.set_cursor();
+                self.move_cursor();
             }
         }
     }
@@ -116,7 +116,7 @@ impl Writer {
         } else {
             self.cursor_y += 1;
         }
-        self.set_cursor();
+        self.move_cursor();
     }
 
     fn clear_row(&mut self, row:usize) {
@@ -129,11 +129,13 @@ impl Writer {
         }
     }
 
-    fn clear_screen(&mut self) {
-        for row in 1..BUFFER_HEIGHT {
+    pub fn clear_screen(&mut self) {
+        for row in 0..BUFFER_HEIGHT {
             self.clear_row(row);
         }
-        self.set_cursor();
+        self.cursor_y = 0;
+        self.cursor_x = 0;
+        self.move_cursor();
     }
 
     pub fn write_string(&mut self, s: &str) {
@@ -145,7 +147,7 @@ impl Writer {
         }
     }
 
-    fn set_cursor(&mut self) {
+    fn move_cursor(&mut self) {
         let cursor_loc = (self.cursor_y * 80 + self.cursor_x) as u16;
         unsafe {
             io::outw(0x3D4, 14);

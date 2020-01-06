@@ -8,14 +8,16 @@ extern crate alloc;
 
 use core::panic::PanicInfo;
 use os::println;
+use os::console;
 use bootloader::{entry_point, BootInfo};
-use alloc::{boxed::Box, vec, vec::Vec, rc::Rc};
- 
+use os::vga_buffer;
+use os::commands;
+
 entry_point!(kernel_main);
 
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
     use os::{allocator, memory};
-    use x86_64::{structures::paging::Page, VirtAddr};
+    use x86_64::{VirtAddr};
 
     os::init();
 
@@ -26,11 +28,14 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     };
 
     allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap initialization failed");
+    commands::init();
 
     #[cfg(test)]
     test_main();
-
-    println!("wOS rust branch v0.1.0");
+   
+    vga_buffer::WRITER.lock().clear_screen();
+    println!("wOS v0.1.0");
+    console::CONSOLE.lock().prompt();
     os::hlt_loop();
 }
 

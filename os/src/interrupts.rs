@@ -4,6 +4,7 @@ use lazy_static::lazy_static;
 use crate::gdt;
 use pic8259_simple::ChainedPics;
 use spin;
+use crate::stdin;
 
 pub const PIC_1_OFFSET: u8 = 32;
 pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
@@ -94,8 +95,8 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(
     if let Ok(Some(key_event)) = keyboard.add_byte(scancode){
         if let Some(key) = keyboard.process_keyevent(key_event) {
             match key {
-                DecodedKey::Unicode(character) => print!("{}", character),
-                DecodedKey::RawKey(key) => print!("{:?}", key),
+                DecodedKey::Unicode(character) => stdin::BUF.lock().write_char(character),
+                DecodedKey::RawKey(key) => print!(""),
             }
         }
     }
