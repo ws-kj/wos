@@ -21,7 +21,7 @@ lazy_static! {
 impl Console {
 
     pub fn prompt(&mut self) {
-        print!("\n{}", self.prompt);
+        print!("{}", self.prompt);
         unsafe { stdin::BUF.force_unlock(); }
         stdin::BUF.lock().set_func(proc_wrapper);
         stdin::BUF.lock().read_line();

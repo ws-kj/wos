@@ -162,7 +162,7 @@ impl Writer {
         }
     }
 
-    fn move_cursor(&mut self, x: usize, y: usize) {
+    pub fn move_cursor(&mut self, x: usize, y: usize) {
         self.cursor_x = x;
         self.cursor_y = y;
         let cursor_loc = (self.cursor_y * 80 + self.cursor_x) as u16;
@@ -172,6 +172,14 @@ impl Writer {
             io::outw(0x3D4, 15);
             io::outw(0x3D5, cursor_loc);
         }
+    }
+
+    pub fn get_cursor_x(&mut self) -> usize {
+        self.cursor_x
+    }
+    
+    pub fn get_cursor_y(&mut self) -> usize {
+        self.cursor_y
     }
 }
 

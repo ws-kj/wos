@@ -7,6 +7,7 @@
 #![feature(alloc_error_handler)]
 #![feature(vec_remove_item)]
 #![feature(asm)]
+#![feature(slice_concat_ext)]
 
 extern crate alloc;
 
