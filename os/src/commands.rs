@@ -50,7 +50,7 @@ pub fn init_command(n: String, c: Command) {
 pub fn get_command(name: String, args: Vec<String>) {
     match COMMANDS.lock().get(&name) {
         Some(com) => (com.func)(args),
-        None => println!("Command not found: {}", name),
+        None => println!("command not found: {}", name),
     }
 }
 

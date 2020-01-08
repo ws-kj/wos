@@ -167,10 +167,10 @@ impl Writer {
         self.cursor_y = y;
         let cursor_loc = (self.cursor_y * 80 + self.cursor_x) as u16;
         unsafe {
-            io::outw(0x3D4, 14);
-            io::outw(0x3D5, cursor_loc >> 8);
-            io::outw(0x3D4, 15);
-            io::outw(0x3D5, cursor_loc);
+            io::outb(0x3D4, 0x0F);
+            io::outb(0x3D5, (cursor_loc & 0xFF) as u8);
+            io::outb(0x3D4, 0x0E);
+            io::outb(0x3D5, ((cursor_loc >> 8) & 0xFF) as u8);
         }
     }
 
