@@ -4,7 +4,7 @@ use alloc::string::{ToString, String};
 use crate::stdin;
 use lazy_static::lazy_static;
 use spin::Mutex;
-use crate::{vga_buffer, print, println};
+use crate::print;
 use alloc::vec::Vec;
 use crate::commands;
 

@@ -1,7 +1,0 @@
-term design
-kb writes to buffer if its open
-cmd gets that buffer input, terminates at newline
-parses it
-finds command for now
-runs said command
-

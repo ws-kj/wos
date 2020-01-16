@@ -8,6 +8,11 @@
 #![feature(vec_remove_item)]
 #![feature(asm)]
 #![feature(slice_concat_ext)]
+#![feature(box_syntax)]
+#![feature(global_asm)]
+#![feature(async_await)]
+#![allow(dead_code)]
+#![allow(unused_variables)]
 
 extern crate alloc;
 
@@ -24,6 +29,9 @@ pub mod io;
 pub mod stdin;
 pub mod console;
 pub mod commands;
+pub mod vfs;
+pub mod initrd;
+pub mod cmos;
 
 #[global_allocator]
 static ALLOCATOR: LockedHeap = LockedHeap::empty();

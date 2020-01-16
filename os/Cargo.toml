@@ -4,7 +4,6 @@ version = "0.1.0"
 authors = ["Will Savage <wsavage6316@gmail.com>"]
 edition = "2018"
 
-
 [dependencies]
 volatile = "0.2.6"
 spin = "0.5.2"

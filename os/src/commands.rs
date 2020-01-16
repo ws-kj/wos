@@ -6,7 +6,7 @@ use lazy_static::lazy_static;
 use alloc::string::String;
 use crate::vga_buffer;
 use crate::println;
-use crate::print;
+use crate::cmos;
 
 pub struct Command {
     com_name: String,
@@ -39,8 +39,14 @@ pub fn init() {
         desc: String::from("list commands and descriptions"),
         func: help_fn,
     };
-
     init_command(String::from("help"), help);
+
+    let time = Command {
+        com_name: String::from("time"),
+        desc: String::from("get the current time"),
+        func: time_fn,
+    };
+    init_command(String::from("time"), time);
 }
 
 pub fn init_command(n: String, c: Command) {
@@ -80,4 +86,8 @@ pub fn help_fn(args: Vec<String>) {
         }
     }
             
+}
+
+pub fn time_fn(args: Vec<String>) {
+    println!("{}", cmos::RTC.lock().get_time());
 }

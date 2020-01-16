@@ -5,7 +5,6 @@ use crate::gdt;
 use pic8259_simple::ChainedPics;
 use spin;
 use crate::stdin;
-use crate::vga_buffer;
 
 pub const PIC_1_OFFSET: u8 = 32;
 pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
