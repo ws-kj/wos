@@ -13,6 +13,7 @@ use bootloader::{entry_point, BootInfo};
 use os::vga_buffer;
 use os::commands;
 use os::cmos;
+use os::timer;
 
 entry_point!(kernel_main);
 
@@ -37,7 +38,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     vga_buffer::WRITER.lock().clear_screen();
 
     println!("wOS v0.1.0    {}", cmos::RTC.lock().get_datetime());
-
+    timer::wait(200);
     println!("kernel debug console - enter 'help' for a list of commands\n");
 
     console::CONSOLE.lock().prompt();

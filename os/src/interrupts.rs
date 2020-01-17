@@ -5,6 +5,7 @@ use crate::gdt;
 use pic8259_simple::ChainedPics;
 use spin;
 use crate::stdin;
+use crate::timer;
 
 pub const PIC_1_OFFSET: u8 = 32;
 pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
@@ -71,6 +72,8 @@ extern "x86-interrupt" fn double_fault_handler(
 extern "x86-interrupt" fn timer_interrupt_handler(
     _stack_frame: &mut InterruptStackFrame)
 {
+    timer::tick();
+    //println!("{}", timer::TIMER.lock().ticks);
     unsafe {
         PICS.lock()
             .notify_end_of_interrupt(InterruptIndex::Timer.as_u8());

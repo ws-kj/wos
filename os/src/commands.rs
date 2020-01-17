@@ -29,21 +29,21 @@ pub fn init() {
 
     let echo = Command {
         com_name: String::from("echo"),
-        desc: String::from("write a string to the screen"),
+        desc: String::from(" write a string to the screen"),
         func: echo_fn,
     };
     init_command(String::from("echo"), echo);
 
     let help = Command {
         com_name: String::from("help"),
-        desc: String::from("list commands and descriptions"),
+        desc: String::from(" list commands and descriptions"),
         func: help_fn,
     };
     init_command(String::from("help"), help);
 
     let time = Command {
         com_name: String::from("time"),
-        desc: String::from("get the current time"),
+        desc: String::from(" get the current time and date"),
         func: time_fn,
     };
     init_command(String::from("time"), time);
@@ -89,5 +89,5 @@ pub fn help_fn(args: Vec<String>) {
 }
 
 pub fn time_fn(args: Vec<String>) {
-    println!("{}", cmos::RTC.lock().get_time());
+    println!("{}", cmos::RTC.lock().get_datetime());
 }

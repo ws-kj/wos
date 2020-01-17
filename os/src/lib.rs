@@ -32,6 +32,7 @@ pub mod commands;
 pub mod vfs;
 pub mod initrd;
 pub mod cmos;
+pub mod timer;
 
 #[global_allocator]
 static ALLOCATOR: LockedHeap = LockedHeap::empty();
@@ -41,6 +42,7 @@ pub fn init() {
     interrupts::init_idt();
     unsafe { interrupts::PICS.lock().initialize() };
     x86_64::instructions::interrupts::enable();
+    timer::init(50);
 }
 
 pub fn hlt_loop() -> ! {
