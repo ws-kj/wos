@@ -1,6 +1,8 @@
 # wOS
 wOS is a hobby operating system written in Rust for the x86_64 platform, and is tested regularly on bare hardware.
 
+![Demo](/promo/demo1.png)
+
 Progress:
 - [x] Paging
 - [x] Dynamic memory allocation
