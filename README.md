@@ -1,4 +1,4 @@
-#wOS
+# wOS
 wOS is a hobby operating system written in Rust for the x86_64 platform, and is tested regularly on bare hardware.
 
 Progress:
