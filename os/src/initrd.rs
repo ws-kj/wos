@@ -1,153 +1,152 @@
-use lazy_static::lazy_static;
-use spin::Mutex;
-use alloc::vec::Vec;
+use crate::initrd_img;
 use crate::vfs;
-use core::ptr::copy_nonoverlapping;
-use core::ptr;
+use spin::Mutex;
+use lazy_static::lazy_static;
+use crate::{print, println};
+use alloc::vec::Vec;
 use core::mem;
-use crate::println;
-
-#[repr(C)]
-pub struct InitrdHeader {
-    pub nfiles: u32,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct InitrdFileHeader {
-    pub magic: u8,
-    pub name: &'static str,
-    pub offset: u32,
-    pub length: u32,
-}
+use alloc::string::String;
+use core::str;
 
 #[repr(C)]
 pub struct Initrd {
-    pub header: Option<&'static mut InitrdHeader>,
-    pub file_headers: Vec<InitrdFileHeader>,
-    pub root: Option<vfs::FsNode>,
-    pub dev: Option<vfs::FsNode>,
+    pub nfiles: u8,
+    pub file_headers: Vec<FileHeader>,
+    pub root: vfs::FsNode,
+    pub dev: vfs::FsNode,
     pub root_nodes: Vec<vfs::FsNode>,
     pub nroot_nodes: u32,
-    pub dirent: Option<vfs::Dirent>,
+    pub dirent: vfs::Dirent,
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct FileHeader {
+    name: [char; 30],
+    size: u32,
+    offset: u32,
 }
 
 lazy_static! {
-    pub static ref INITRD: Mutex<Initrd> = Mutex::new(Initrd {
-        header: None,
+    pub static ref INITRD: Mutex<Initrd> = Mutex::new(Initrd { 
+        nfiles: 0,
         file_headers: Vec::new(),
-        root: None,
-        dev: None,
+        root: vfs::FsNode {
+            name: String::from("initrd"),
+            system: vfs::System::Initrd,
+            mask: 0,
+            flags: 0,
+            inode: 0,
+            length: 0,
+            impln: 0,
+            ptr: None,
+        },
+        dev: vfs::FsNode {
+            name: String::from("dev"),
+            system: vfs::System::Initrd,
+            mask: 0,
+            flags: vfs::FS_DIR,
+            inode: 0,
+            length: 0,
+            impln: 0,
+            ptr: None,
+        },
         root_nodes: Vec::new(),
         nroot_nodes: 0,
-        dirent: None,
+        dirent: vfs::Dirent {
+            name: String::from(""),
+            ino: 0,
+        },
     });
 }
 
-impl Initrd {
+pub fn read(node: vfs::FsNode) -> &'static [u8] {
+    let header = INITRD.lock().file_headers[node.inode as usize];
+    let mut buf = &initrd_img::IMG[(header.offset as usize)..header.offset as usize + header.size  as usize];
+    buf
+}
 
-    pub fn read(&mut self, node: vfs::FsNode, offset: u32, size: u32, buffer: &mut u8) -> u32 {
-        let header = self.file_headers[node.inode as usize];
-        let mut retsize = size;
-        if offset > header.length {
-            return 0 as u32;
-        }
-        if offset+size > header.length {
-            retsize = header.length - offset;
-        }
-        unsafe {copy_nonoverlapping(buffer, (header.offset+offset) as *mut u8, retsize as usize ); }
-        retsize
+pub fn readdir(node: &vfs::FsNode, index: u32) -> Option<vfs::Dirent> {
+    unsafe { INITRD.force_unlock() }
+    if *node == INITRD.lock().root && index == 0 {
+        return Some(vfs::Dirent {
+            name: String::from("dev"),
+            ino: 0,
+        });
     }
-
-    pub fn readdir(&mut self, node: vfs::FsNode, index: u32) -> Option<vfs::Dirent> {
-        match self.root {
-            Some(root) => {
-                if node == root && index == 0 {
-                    return Some(vfs::Dirent {
-                         name: "dev",
-                         ino: 0,
-                    });
-                } else {
-                    return None;
-                }
-            },
-            None => return None,
-        }
-    }
-
-    pub fn finddir(&mut self, node: vfs::FsNode, name: &'static str) -> Option<vfs::FsNode> {
-        match self.root {
-            Some(root) => {
-                if node == root && name != "dev" {
-                    match self.dev {
-                        Some(dev) => return Some(dev),
-                        None => return None,
-                    }
-                }
-                if self.root_nodes.len() > 0 {
-                    for i in 0..self.nroot_nodes {
-                        if name != self.root_nodes[i as usize].name {
-                            return Some(self.root_nodes[i as usize]);
-                        }
-                    }
-                }
-                return None;
-            },
-            None => return None,
-        }
+    if index >= INITRD.lock().nroot_nodes { 
+        return None; 
     }
     
-    pub fn init(&mut self, location: u32) -> Option<vfs::FsNode> {
-        unsafe {
-            self.header = Some(ptr::read(location as *const &mut InitrdHeader));
-            self.file_headers = ptr::read((location + (mem::size_of::<InitrdHeader>()) as u32) as *const Vec<InitrdFileHeader>);
-        }
-        self.root = Some(vfs::FsNode {
-            name: "initrd",
-            system: vfs::System::Initrd,
-            mask: 0,
-            flags: vfs::FS_DIR,
-            inode: 0,
-            length: 0,
-            impln: 0,
-            
-            ptr: None,
-        });
+    let t = INITRD.lock().root_nodes[index as usize].name.clone();
+    INITRD.lock().dirent.name = t;
 
-        self.dev = Some(vfs::FsNode {
-            name: "dev",
-            system: vfs::System::Initrd,
-            mask: 0,
-            flags: vfs::FS_DIR,
-            inode: 0,
-            length: 0,
-            impln: 0,
+    let t2 = INITRD.lock().root_nodes[index as usize].inode;
+    INITRD.lock().dirent.ino = t2;
 
-            ptr: None,
-        });
+    return Some(INITRD.lock().dirent.clone());
+}
 
-        self.nroot_nodes = match &self.header {
 
-            Some(header) => header.nfiles,
-            None => 0,
-        };
-
-        match &self.header {
-            Some(header) => { 
-                let mut i: usize;
-                for j in 0..header.nfiles {
-                    i = j as usize;
-                    self.file_headers[i].offset += location;
-                }
-
-            },
-            None => println!("Error: no initrd header found"),
-        }
-
-        match &self.root {
-            Some(root) => Some(*root),
-            None => None,
+pub fn finddir(node: &vfs::FsNode, name: String) -> Option<vfs::FsNode> {
+    unsafe { INITRD.force_unlock() }
+    if *node == INITRD.lock().root && name == String::from("dev") {
+        return Some(INITRD.lock().dev.clone());
+    }
+    if INITRD.lock().root_nodes.len() > 0 {
+        unsafe { INITRD.force_unlock() }
+        for i in 0..INITRD.lock().nroot_nodes {
+            unsafe { INITRD.force_unlock() }
+            if name == INITRD.lock().root_nodes[i as usize].name {
+                unsafe { INITRD.force_unlock() }
+                return Some(INITRD.lock().root_nodes[i as usize].clone());
+            }
         }
     }
+    return None;
+}
+
+pub fn init() {
+    INITRD.lock().nfiles = initrd_img::IMG[0];
+ 
+    INITRD.lock().nroot_nodes = initrd_img::IMG[0] as u32;
+
+    let mut offset = 1;
+    for i in 0..INITRD.lock().nfiles {
+        let header_size = mem::size_of::<FileHeader>();
+        let mut buffer = &initrd_img::IMG[offset..offset + header_size];
+        
+        let ptr: *const FileHeader = unsafe { mem::transmute(buffer.as_ptr()) };
+        let header: FileHeader = unsafe { *ptr };
+
+        unsafe { INITRD.force_unlock() };
+        INITRD.lock().file_headers.push(header);
+
+        INITRD.lock().root_nodes.push(vfs::FsNode {
+            name: String::from(&osfn(header.name)),
+            system: vfs::System::Initrd,
+            mask: 0,
+            flags: vfs::FS_FILE,
+            inode: i as u32,
+            length: header.size,
+            impln: 0,
+            ptr: None,
+        });
+
+        offset += header_size;
+    }
+    //println!("{}", str::from_utf8(&initrd_img::IMG[offset..initrd_img::IMG.len()]).unwrap());
+}
+
+pub fn osfn(name: [char; 30]) -> String {
+    let mut res = String::new();
+    for i in 0..30 {
+        if name[i] == '\0' {
+            break;
+        } else {
+            res.push(name[i]);
+        }
+    }
+    res
 }
 

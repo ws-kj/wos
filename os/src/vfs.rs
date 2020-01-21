@@ -1,6 +1,8 @@
 use lazy_static::lazy_static;
 use spin::Mutex;
 use crate::initrd;
+use alloc::string::String;
+use crate::println;
 
 pub const FS_FILE: u32      = 0x01;
 pub const FS_DIR: u32       = 0x02;
@@ -10,14 +12,18 @@ pub const FS_PIPE: u32      = 0x05;
 pub const FS_SYMLINK: u32   = 0x06;
 pub const FS_MNTPOINT: u32  = 0x08;
 
-#[derive(Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum System {
     Initrd,
 }
 
+pub struct FsRoot {
+    pub node: FsNode,
+}
+
 lazy_static! {
-    pub static ref FS_ROOT: Mutex<FsNode> = Mutex::new(FsNode {
-        name: "",
+    pub static ref FS_ROOT: Mutex<FsRoot> = Mutex::new(FsRoot { node: FsNode {
+        name: String::from("/"),
         system: System::Initrd,
         mask: 0,
         flags: 0,
@@ -25,20 +31,20 @@ lazy_static! {
         length: 0,
         impln: 0,
         ptr: None,
-    });
+    }});
 }
 
 #[derive(Clone)]
 #[repr(C)]
 pub struct Dirent {
-    pub name: &'static str,
+    pub name: String,
     pub ino:  u32,
 }
 
-#[derive(Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 #[repr(C)]
 pub struct FsNode {
-    pub name:   &'static str,
+    pub name:   String,
     pub system: System,
     pub mask:   u32,
     pub flags:  u32,
@@ -49,13 +55,13 @@ pub struct FsNode {
     pub ptr: Option<&'static FsNode>,
 }
 
-pub fn read_fs(node: FsNode, offset: u32, size: u32, buffer:  &mut u8) -> u32 {
+pub fn read_fs(node: FsNode) -> &'static [u8] {
     match node.system {
-        System::Initrd => initrd::INITRD.lock().read(node, offset, size, buffer),
+        System::Initrd => initrd::read(node),
     }
 }
-
-/*TODO: Implement write, open, and close for InitRD
+/*
+TODO: Implement write, open, and close for InitRD
 pub fn write_fs(node: FsNode, offset: u32, size: u32, buffer: u8) -> u32 {
     match node.system {
         System::Initrd => initrd::INITRD.lock().write(node, offset, size, buffer),
@@ -78,11 +84,11 @@ pub fn close_fs(node: FsNode) {
 }
 */
 
-pub fn readdir_fs(node: FsNode, index: u32) -> Option<Dirent> {
+pub fn readdir_fs(node: &FsNode, index: u32) -> Option<Dirent> {
     if (node.flags&0x7) == FS_DIR {
         match node.system {
             System::Initrd => {
-                match initrd::INITRD.lock().readdir(node, index) {
+                match initrd::readdir(node, index) {
                     Some(d) => return Some(d),
                     None => return None,
                 }
@@ -93,11 +99,11 @@ pub fn readdir_fs(node: FsNode, index: u32) -> Option<Dirent> {
     }
 }
 
-pub fn finddir_fs(node: FsNode, name: &'static str) -> Option<FsNode> {
+pub fn finddir_fs(node: &FsNode, name: String) -> Option<FsNode> {
     if (node.flags&0x7) == FS_DIR {
         match node.system {
             System::Initrd => {
-                match initrd::INITRD.lock().finddir(node, name) {
+                match initrd::finddir(node, name) {
                     Some(n) => return Some(n),
                     None => return None,
                 }

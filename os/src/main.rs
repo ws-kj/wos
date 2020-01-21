@@ -7,13 +7,16 @@
 extern crate alloc;
 
 use core::panic::PanicInfo;
-use os::{println, print};
+use os::println;
 use os::console;
 use bootloader::{entry_point, BootInfo};
 use os::vga_buffer;
 use os::commands;
 use os::cmos;
-use os::timer;
+use os::initrd;
+use os::vfs;
+use alloc::string::String;
+use core::str;
 
 entry_point!(kernel_main);
 
@@ -36,11 +39,41 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     test_main();
    
     vga_buffer::WRITER.lock().clear_screen();
+    initrd::init();
+
+    let mut node = vfs::Dirent { 
+        name: String::from(""),
+        ino: 0,
+    };
+    let mut i = 0;
+    loop {
+        match vfs::readdir_fs(&initrd::INITRD.lock().dev, i) {
+            Some(n) => {
+                node = n;
+                println!("Found file: {}", node.name);
+                unsafe { initrd::INITRD.force_unlock() }
+                let fsnode = vfs::finddir_fs(&initrd::INITRD.lock().dev, node.name);
+                match fsnode {
+                    Some(f) => {
+                        if f.flags&0x7 == vfs::FS_DIR {
+                            println!("(dir)");
+                        } else {
+                            println!("contents: {}", str::from_utf8(&vfs::read_fs(f)).unwrap());
+                        }
+                        i += 1;
+                    },
+                    None => i += 1,
+                }
+            },
+            None => break,
+        }
+
+        
+    }
 
     println!("wOS v0.1.0    {}", cmos::RTC.lock().get_datetime());
-    timer::wait(200);
     println!("kernel debug console - enter 'help' for a list of commands\n");
-
+    
     console::CONSOLE.lock().prompt();
     os::hlt_loop();
 }

@@ -1,6 +1,5 @@
 use crate::io;
 use lazy_static::lazy_static;
-use crate::println;
 use spin::Mutex;
 
 #[derive(Default)]
@@ -30,7 +29,6 @@ pub fn wait(ticks: usize) {
     let eticks: usize;
     unsafe { TIMER.force_unlock() }
     eticks = TIMER.lock().ticks + ticks;
-    println!("g");
     while TIMER.lock().ticks < eticks {} 
 }
 

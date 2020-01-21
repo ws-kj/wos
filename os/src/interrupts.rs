@@ -73,7 +73,6 @@ extern "x86-interrupt" fn timer_interrupt_handler(
     _stack_frame: &mut InterruptStackFrame)
 {
     timer::tick();
-    //println!("{}", timer::TIMER.lock().ticks);
     unsafe {
         PICS.lock()
             .notify_end_of_interrupt(InterruptIndex::Timer.as_u8());

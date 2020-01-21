@@ -27,3 +27,7 @@ pub unsafe fn inl(port: u16) -> u32 {
 pub unsafe fn outl(port: u16, value: u32) {
     asm!("outl %eax, %dx" :: "{dx}"(port), "{eax}"(value) :: "volatile");
 }
+
+pub unsafe fn insl(port: u16, buffer: u32, count: u32) {
+    asm!("cld; rep; insl %dx, %es:(%edi)" :: "{edi}"(buffer) "{dx}"(port), "{ecx}"(count) :: "volatile");
+}

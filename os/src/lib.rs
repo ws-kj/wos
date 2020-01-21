@@ -13,6 +13,9 @@
 #![feature(async_await)]
 #![allow(dead_code)]
 #![allow(unused_variables)]
+#![allow(unused_assignments)]
+#![feature(const_str_as_bytes)]
+
 
 extern crate alloc;
 
@@ -33,6 +36,7 @@ pub mod vfs;
 pub mod initrd;
 pub mod cmos;
 pub mod timer;
+pub mod initrd_img;
 
 #[global_allocator]
 static ALLOCATOR: LockedHeap = LockedHeap::empty();

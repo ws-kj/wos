@@ -80,6 +80,10 @@ pub struct Writer {
 }
 
 impl Writer {
+    pub fn set_color(&mut self, fg: Color, bg: Color) {
+        self.color_code = ColorCode::new(fg, bg);
+    }
+
     pub fn backspace(&mut self) {
         self.move_cursor(self.cursor_x - 1, self.cursor_y);
         let color_code = self.color_code;

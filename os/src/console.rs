@@ -7,6 +7,7 @@ use spin::Mutex;
 use crate::print;
 use alloc::vec::Vec;
 use crate::commands;
+use crate::vga_buffer;
 
 pub struct Console {
     prompt: &'static str,
@@ -21,7 +22,10 @@ lazy_static! {
 impl Console {
 
     pub fn prompt(&mut self) {
+        vga_buffer::WRITER.lock().set_color(vga_buffer::Color::LightCyan, vga_buffer::Color::Black);
         print!("{}", self.prompt);
+        vga_buffer::WRITER.lock().set_color(vga_buffer::Color::White, vga_buffer::Color::Black);
+
         unsafe { stdin::BUF.force_unlock(); }
         stdin::BUF.lock().set_func(proc_wrapper);
         stdin::BUF.lock().read_line();
