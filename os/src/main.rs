@@ -41,7 +41,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     vga_buffer::WRITER.lock().clear_screen();
     initrd::init();
 
-    let mut node = vfs::Dirent { 
+    /*let mut node = vfs::Dirent { 
         name: String::from(""),
         ino: 0,
     };
@@ -56,9 +56,9 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
                 match fsnode {
                     Some(f) => {
                         if f.flags&0x7 == vfs::FS_DIR {
-                            println!("(dir)");
+                            println!("  (dir)");
                         } else {
-                            println!("contents: {}", str::from_utf8(&vfs::read_fs(f)).unwrap());
+                            println!(   "contents: {}", str::from_utf8(&vfs::read_fs(f)).unwrap());
                         }
                         i += 1;
                     },
@@ -70,7 +70,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
         
     }
-
+*/
     println!("wOS v0.1.0    {}", cmos::RTC.lock().get_datetime());
     println!("kernel debug console - enter 'help' for a list of commands\n");
     

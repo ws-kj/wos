@@ -5,8 +5,11 @@ use spin::Mutex;
 use lazy_static::lazy_static;
 use alloc::string::String;
 use crate::vga_buffer;
-use crate::println;
+use crate::{print, println};
 use crate::cmos;
+use crate::vfs;
+use crate::initrd;
+use core::str;
 
 pub struct Command {
     com_name: String,
@@ -29,24 +32,45 @@ pub fn init() {
 
     let echo = Command {
         com_name: String::from("echo"),
-        desc: String::from(" write a string to the screen"),
+        desc: String::from("write a string to the screen"),
         func: echo_fn,
     };
     init_command(String::from("echo"), echo);
 
     let help = Command {
         com_name: String::from("help"),
-        desc: String::from(" list commands and descriptions"),
+        desc: String::from("list commands and descriptions"),
         func: help_fn,
     };
     init_command(String::from("help"), help);
 
     let time = Command {
         com_name: String::from("time"),
-        desc: String::from(" get the current time and date"),
+        desc: String::from("get the current time and date"),
         func: time_fn,
     };
     init_command(String::from("time"), time);
+
+    let ls = Command {
+        com_name: String::from("ls"),
+        desc: String::from("list files"),
+        func: ls_fn,
+    };
+    init_command(String::from("ls"), ls);
+
+    let read = Command {
+        com_name: String::from("read"),
+        desc: String::from("get contents of a file"),
+        func: read_fn,
+    };
+    init_command(String::from("read"), read);
+
+    let info = Command {
+        com_name: String::from("info"),
+        desc: String::from("get info about file(s)"),
+        func: info_fn,
+    };
+    init_command(String::from("info"), info);
 }
 
 pub fn init_command(n: String, c: Command) {
@@ -91,3 +115,51 @@ pub fn help_fn(args: Vec<String>) {
 pub fn time_fn(args: Vec<String>) {
     println!("{}", cmos::RTC.lock().get_datetime());
 }
+
+pub fn ls_fn(args: Vec<String>) {
+    let mut node = vfs::Dirent {
+        name: String::from(""),
+        ino: 0,
+    };
+    let mut i = 0;
+    loop {
+        match vfs::readdir_fs(&initrd::INITRD.lock().dev, i) {
+            Some(n) => {
+                node = n;
+                println!("{}", node.name);
+                i += 1;
+            },
+            None => break,
+        }
+    }
+}
+
+pub fn read_fn(args: Vec<String>) {
+    let node = vfs::finddir_fs(&initrd::INITRD.lock().dev, args[1].clone());
+    match node {
+        Some(n) => {
+            if n.flags&0x7 == vfs::FS_DIR {
+                println!("{} is a directory", n.name);
+            } else {
+                println!("{}", str::from_utf8(&vfs::read_fs(n)).unwrap());
+            }
+        },
+        None => print!("file not found: {}", &args[1]),
+    }
+}
+
+pub fn info_fn(args: Vec<String>) {
+    for i in 1..args.len() {
+        let node = vfs::finddir_fs(&initrd::INITRD.lock().dev, args[i].clone());
+        match node {
+            Some(n) => {
+                println!("file: {}", n.name);
+                println!("    flags: {}", n.flags);
+                println!("    length: {}B", n.length);
+            },
+            None => println!("file not found: {}", &args[i]),
+        }
+        println!();
+    }
+}
+

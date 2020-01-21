@@ -90,7 +90,7 @@ pub fn readdir(node: &vfs::FsNode, index: u32) -> Option<vfs::Dirent> {
 
 pub fn finddir(node: &vfs::FsNode, name: String) -> Option<vfs::FsNode> {
     unsafe { INITRD.force_unlock() }
-    if *node == INITRD.lock().root && name == String::from("dev") {
+    if *node == INITRD.lock().root && name != String::from("dev") {
         return Some(INITRD.lock().dev.clone());
     }
     if INITRD.lock().root_nodes.len() > 0 {
