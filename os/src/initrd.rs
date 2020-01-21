@@ -2,11 +2,9 @@ use crate::initrd_img;
 use crate::vfs;
 use spin::Mutex;
 use lazy_static::lazy_static;
-use crate::{print, println};
 use alloc::vec::Vec;
 use core::mem;
 use alloc::string::String;
-use core::str;
 
 #[repr(C)]
 pub struct Initrd {
@@ -62,7 +60,7 @@ lazy_static! {
 
 pub fn read(node: vfs::FsNode) -> &'static [u8] {
     let header = INITRD.lock().file_headers[node.inode as usize];
-    let mut buf = &initrd_img::IMG[(header.offset as usize)..header.offset as usize + header.size  as usize];
+    let buf = &initrd_img::IMG[(header.offset as usize)..header.offset as usize + header.size  as usize];
     buf
 }
 
@@ -114,7 +112,7 @@ pub fn init() {
     let mut offset = 1;
     for i in 0..INITRD.lock().nfiles {
         let header_size = mem::size_of::<FileHeader>();
-        let mut buffer = &initrd_img::IMG[offset..offset + header_size];
+        let buffer = &initrd_img::IMG[offset..offset + header_size];
         
         let ptr: *const FileHeader = unsafe { mem::transmute(buffer.as_ptr()) };
         let header: FileHeader = unsafe { *ptr };

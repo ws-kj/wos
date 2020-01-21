@@ -5,7 +5,7 @@ use spin::Mutex;
 use lazy_static::lazy_static;
 use alloc::string::String;
 use crate::vga_buffer;
-use crate::{print, println};
+use crate::println;
 use crate::cmos;
 use crate::vfs;
 use crate::initrd;
@@ -135,6 +135,11 @@ pub fn ls_fn(args: Vec<String>) {
 }
 
 pub fn read_fn(args: Vec<String>) {
+    if args.len() <= 1 {
+        println!("please specify a file");
+        return ();
+    }
+
     let node = vfs::finddir_fs(&initrd::INITRD.lock().dev, args[1].clone());
     match node {
         Some(n) => {
@@ -144,7 +149,7 @@ pub fn read_fn(args: Vec<String>) {
                 println!("{}", str::from_utf8(&vfs::read_fs(n)).unwrap());
             }
         },
-        None => print!("file not found: {}", &args[1]),
+        None => println!("file not found: {}", &args[1]),
     }
 }
 

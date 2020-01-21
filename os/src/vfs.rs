@@ -2,7 +2,6 @@ use lazy_static::lazy_static;
 use spin::Mutex;
 use crate::initrd;
 use alloc::string::String;
-use crate::println;
 
 pub const FS_FILE: u32      = 0x01;
 pub const FS_DIR: u32       = 0x02;
@@ -26,12 +25,17 @@ lazy_static! {
         name: String::from("/"),
         system: System::Initrd,
         mask: 0,
-        flags: 0,
+        flags: 2,
         inode: 0,
         length: 0,
         impln: 0,
         ptr: None,
     }});
+
+    pub static ref CDIR: Mutex<Dirent> = Mutex::new(Dirent {
+        name: FS_ROOT.lock().node.name.clone(),
+        ino: FS_ROOT.lock().node.inode,
+    });
 }
 
 #[derive(Clone)]
@@ -113,4 +117,3 @@ pub fn finddir_fs(node: &FsNode, name: String) -> Option<FsNode> {
         None
     }
 }
-
