@@ -9,6 +9,7 @@ Progress:
 - [x] Basic 80x25 vga shell
 - [x] RTC support
 - [x] Basic VFS
+- [x] InitRD
 - [ ] HDD driver
 - [ ] Filesystem driver
 - [ ] ELF executables
