@@ -14,8 +14,6 @@ use os::vga_buffer;
 use os::commands;
 use os::cmos;
 use os::initrd;
-use os::vfs;
-use alloc::string::String;
 
 entry_point!(kernel_main);
 

@@ -8,7 +8,6 @@ use crate::print;
 use alloc::vec::Vec;
 use crate::commands;
 use crate::vga_buffer;
-use crate::vfs;
 
 pub struct Console {
     prompt: &'static str,

@@ -16,7 +16,6 @@ struct FileHeader {
 
 fn main() -> std::io::Result<()> {
     gen_img()?;
-    gen_rs()?;
     Ok(())
 }
 
@@ -78,17 +77,3 @@ fn gen_img() -> std::io::Result<()> {
     Ok(())
 }
 
-fn gen_rs() -> std::io::Result<()> {
-    //hacky initrd solution: generate .rs file with initrd.img as &[u8]
-    let mut rs = File::create("../initrd_img.rs")?;
-    rs.write(b"use core::str;\n")?;
-    rs.write(b"pub const IMG: &[u8] = \"")?;
-    let mut img_contents = String::new();
-    let mut ird2 = File::open("initrd.img")?;
-    ird2.read_to_string(&mut img_contents);
-    rs.write(img_contents.as_bytes())?;
-    println!("{}", img_contents);
-    rs.write(b"\".as_bytes();")?;
-
-    Ok(())
-}

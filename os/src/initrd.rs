@@ -5,7 +5,6 @@ use lazy_static::lazy_static;
 use alloc::vec::Vec;
 use core::mem;
 use alloc::string::String;
-use crate::println;
 
 #[repr(C)]
 pub struct Initrd {

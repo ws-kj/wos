@@ -2,7 +2,6 @@ use lazy_static::lazy_static;
 use spin::Mutex;
 use crate::initrd;
 use alloc::string::String;
-use crate::println;
 use alloc::vec::Vec;
 
 pub const FS_FILE: u32      = 0x01;

@@ -9,7 +9,6 @@ use crate::println;
 use crate::print;
 use crate::cmos;
 use crate::vfs;
-use crate::initrd;
 use core::str;
 
 pub struct Command {
