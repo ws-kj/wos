@@ -63,46 +63,6 @@ pub fn read(node: vfs::FsNode) -> &'static [u8] {
     buf
 }
 
-pub fn readdir(node: &vfs::FsNode, index: u32) -> Option<vfs::Dirent> {
-    unsafe { INITRD.force_unlock() }
-    if *node == INITRD.lock().root && index == 0 {
-        return Some(vfs::Dirent {
-            name: String::from("dev"),
-            ino: 0,
-        });
-    }
-    if index >= INITRD.lock().nroot_nodes { 
-        return None; 
-    }
-    
-    let t = INITRD.lock().root_nodes[index as usize].name.clone();
-    INITRD.lock().dirent.name = t;
-
-    let t2 = INITRD.lock().root_nodes[index as usize].inode;
-    INITRD.lock().dirent.ino = t2;
-
-    return Some(INITRD.lock().dirent.clone());
-}
-
-
-pub fn finddir(node: &vfs::FsNode, name: String) -> Option<vfs::FsNode> {
-    unsafe { INITRD.force_unlock() }
-    if *node == INITRD.lock().root && name != String::from("dev") {
-        return Some(INITRD.lock().dev.clone());
-    }
-    if INITRD.lock().root_nodes.len() > 0 {
-        unsafe { INITRD.force_unlock() }
-        for i in 0..INITRD.lock().nroot_nodes {
-            unsafe { INITRD.force_unlock() }
-            if name == INITRD.lock().root_nodes[i as usize].name {
-                unsafe { INITRD.force_unlock() }
-                return Some(INITRD.lock().root_nodes[i as usize].clone());
-            }
-        }
-    }
-    return None;
-}
-
 pub fn init() {
     INITRD.lock().nfiles = initrd_img::IMG[0];
  
@@ -112,7 +72,7 @@ pub fn init() {
     vfs::FS_ROOT.lock().node.children.push(&INITRD.lock().root as *const vfs::FsNode);
 
     let mut offset = 1;
-    for i in 0..INITRD.lock().nfiles {
+    for i in 0..INITRD.lock().nroot_nodes {
         let header_size = mem::size_of::<FileHeader>();
         let buffer = &initrd_img::IMG[offset..offset + header_size];
         
@@ -132,11 +92,15 @@ pub fn init() {
             length: header.size,
             children: Vec::new(),
         };
-        //INITRD.lock().root_nodes.push(node);
-        //let n = &INITRD.lock().root_nodes[i as usize];
-        //vfs::FS_ROOT.lock().node.children.push(&node.clone() as *const vfs::FsNode);
+        INITRD.lock().root_nodes.push(node);
         //println!("{}", vfs::get_nth_child(&vfs::FS_ROOT.lock().node, i as usize + 2).unwrap().name);
         offset += header_size;
+    }
+
+    for i in 0..INITRD.lock().root_nodes.len() {
+        unsafe { INITRD.force_unlock() }
+        let n = &INITRD.lock().root_nodes[i as usize];
+        vfs::FS_ROOT.lock().node.children.push(n as *const vfs::FsNode);
     }
     //println!("{}", str::from_utf8(&initrd_img::IMG[offset..initrd_img::IMG.len()]).unwrap());
 }
