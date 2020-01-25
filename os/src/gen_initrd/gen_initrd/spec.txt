@@ -1,0 +1,19 @@
+INITRD FORMAT
+
+name: up to 30 characters, including \0
+
+header: 128 bytes
+name:   [char; 30]      120
+size:   u32             4
+offset: u32             4
+
+*-[INITRD]--[2 files]----------------------------------------------------*
+|                                                                        |
+| *-nfiles-*-header----------*-header----------*-test1.txt-*-test2.txt-* |
+| |        | name: test1.txt | name: test2.txt |           |           | |
+| | u8:  2 | size: 16        | size: 32        | size: 16  | size: 32  | |
+| |        | offset: 256     | offset: 272     |           |           | |
+| *--------*-----------------*-----------------*-----------*-----------* |
+|          1                129               257         273            |
+*------------------------------------------------------------------------*
+

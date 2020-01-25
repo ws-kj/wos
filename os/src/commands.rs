@@ -6,6 +6,7 @@ use lazy_static::lazy_static;
 use alloc::string::String;
 use crate::vga_buffer;
 use crate::println;
+use crate::print;
 use crate::cmos;
 use crate::vfs;
 use crate::initrd;
@@ -117,19 +118,14 @@ pub fn time_fn(args: Vec<String>) {
 }
 
 pub fn ls_fn(args: Vec<String>) {
-    let mut node = vfs::Dirent {
-        name: String::from(""),
-        ino: 0,
-    };
-    let mut i = 0;
-    loop {
-        match vfs::readdir_fs(&initrd::INITRD.lock().dev, i) {
-            Some(n) => {
-                node = n;
-                println!("{}", node.name);
-                i += 1;
-            },
-            None => break,
+    for c in vfs::FS_ROOT.lock().node.children.iter() {
+        unsafe {
+            print!("{}", (*(*c)).name);
+            if (*(*c)).flags&0x7 == vfs::FS_DIR {
+                println!("/");
+            } else {
+                println!();
+            }
         }
     }
 }
@@ -140,10 +136,13 @@ pub fn read_fn(args: Vec<String>) {
         return ();
     }
 
-    let node = vfs::finddir_fs(&initrd::INITRD.lock().dev, args[1].clone());
+    //let node = vfs::finddir_fs(&initrd::INITRD.lock().dev, args[1].clone());
+    
+    let node = vfs::get_child(&vfs::FS_ROOT.lock().node, args[1].clone());
+
     match node {
         Some(n) => {
-            if n.flags&0x7 == vfs::FS_DIR {
+            if (n.flags&0x7 == vfs::FS_DIR) && n.length == 0 {
                 println!("{} is a directory", n.name);
             } else {
                 println!("{}", str::from_utf8(&vfs::read_fs(n)).unwrap());
@@ -154,8 +153,10 @@ pub fn read_fn(args: Vec<String>) {
 }
 
 pub fn info_fn(args: Vec<String>) {
+
+    //println!("{}", vfs::get_nth_child(&initrd::INITRD.lock().root, 0).unwrap().name);
     for i in 1..args.len() {
-        let node = vfs::finddir_fs(&initrd::INITRD.lock().dev, args[i].clone());
+        let node = vfs::get_child(&vfs::FS_ROOT.lock().node, args[i].clone());
         match node {
             Some(n) => {
                 println!("file: {}", n.name);
@@ -164,7 +165,7 @@ pub fn info_fn(args: Vec<String>) {
             },
             None => println!("file not found: {}", &args[i]),
         }
-        println!();
+        println!(); 
     }
 }
 

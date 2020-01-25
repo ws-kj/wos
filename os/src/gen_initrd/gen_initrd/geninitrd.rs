@@ -4,10 +4,9 @@ use std::env;
 use std::mem;
 use std::vec::Vec;
 use std::string::String;
-use std::str;
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone)]
 struct FileHeader {
     name: [char; 30],
     size: u32,
@@ -32,6 +31,7 @@ fn gen_img() -> std::io::Result<()> {
     let mut args: Vec<String> = env::args().collect();
     let _t = args.remove(0);
     let nheaders =  args.len();
+
     let mut off = mem::size_of::<FileHeader>() * nheaders + mem::size_of::<u8>();
 
     let mut headers = vec![FileHeader {
@@ -71,7 +71,6 @@ fn gen_img() -> std::io::Result<()> {
         let mut file = File::open(&args[i])?;
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
-        //println!("{}", contents);
         initrd.write(contents.as_bytes())?;
     }
 
@@ -87,7 +86,6 @@ fn gen_rs() -> std::io::Result<()> {
     let mut ird2 = File::open("initrd.img")?;
     ird2.read_to_string(&mut img_contents);
     rs.write(img_contents.as_bytes())?;
-    println!("{}", img_contents);
     rs.write(b"\".as_bytes();")?;
 
     Ok(())

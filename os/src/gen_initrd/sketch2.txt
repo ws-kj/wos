@@ -1,0 +1,19 @@
+traditional:    folder                             /home/user:
+                  |                                     |
+        ------------------               ----------------------------
+        file  file  folder               Desktop/ project/ Documents/
+                      |                                |
+              ------------------              --------------------
+              file  folder  file              project.c  project.h
+
+
+idea #1: no distinction between files, folders, and executables. Any file can have children, or/and be executable.
+
+        project.x/
+            |
+   ---------------------------
+   main.c/      aux.c/  test.c
+      |           |
+   ---------    ------
+   project.h    aux.h/
+
