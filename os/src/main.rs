@@ -42,7 +42,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     println!("wOS v0.1.0    {}", cmos::RTC.lock().get_datetime());
     println!("kernel debug console - enter 'help' for a list of commands\n");
     
-    console::CONSOLE.lock().prompt();
+    console::prompt();
     os::hlt_loop();
 }
 

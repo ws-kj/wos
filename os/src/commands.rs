@@ -10,6 +10,7 @@ use crate::print;
 use crate::cmos;
 use crate::vfs;
 use core::str;
+use crate::console;
 
 pub struct Command {
     com_name: String,
@@ -71,6 +72,20 @@ pub fn init() {
         func: info_fn,
     };
     init_command(String::from("info"), info);
+
+    let pwd = Command {
+        com_name: String::from("pwd"),
+        desc: String::from("print working directory"),
+        func: pwd_fn,
+    };
+    init_command(String::from("pwd"), pwd);
+
+    let cd = Command {
+        com_name: String::from("cd"),
+        desc: String::from("change working directory"),
+        func: cd_fn,
+    };
+    init_command(String::from("cd"), cd);
 }
 
 pub fn init_command(n: String, c: Command) {
@@ -117,7 +132,21 @@ pub fn time_fn(args: Vec<String>) {
 }
 
 pub fn ls_fn(args: Vec<String>) {
-    for c in vfs::FS_ROOT.lock().node.children.iter() {
+
+    let mut node = console::get_wd();
+
+    if args.len() > 1 {
+        match vfs::get_node(&console::get_wd(), args[1].clone()) {
+            Some(n) => node = n.clone(),
+            None => {
+                println!("file not found: {}", &args[1]);
+                return ();
+            },
+        }
+    }
+
+
+    for c in node.children.iter() {
         unsafe {
             print!("{}", (*(*c)).name);
             if (*(*c)).flags&0x7 == vfs::FS_DIR {
@@ -136,7 +165,7 @@ pub fn read_fn(args: Vec<String>) {
     }
 
     //let node = vfs::get_child(&vfs::FS_ROOT.lock().node, args[1].clone());
-    let node = vfs::get_node_from_path(args[1].clone());
+    let node = vfs::get_node(&console::get_wd(), args[1].clone());
     match node {
         Some(n) => {
             if (n.flags&0x7 == vfs::FS_DIR) && n.length == 0 {
@@ -151,7 +180,7 @@ pub fn read_fn(args: Vec<String>) {
 
 pub fn info_fn(args: Vec<String>) {
     for i in 1..args.len() {
-        let node = vfs::get_node_from_path(args[i].clone());
+        let node = vfs::get_node(&console::get_wd(), args[i].clone());
         match node {
             Some(n) => {
                 println!("file: {}", n.name);
@@ -165,3 +194,18 @@ pub fn info_fn(args: Vec<String>) {
     }
 }
 
+pub fn pwd_fn(args: Vec<String>) {
+    println!("{}", &console::get_wd().name);
+}
+
+pub fn cd_fn(args: Vec<String>) {
+    if args.len() == 1 { 
+        console::set_wd(&vfs::FS_ROOT.lock().node);
+        return ();
+    }
+
+    match vfs::get_node(&console::get_wd(), args[1].clone()) {
+        Some(n) => console::set_wd(&n),
+        None => println!("file not found: {}", &args[1]),
+    }
+}

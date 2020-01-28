@@ -131,7 +131,7 @@ pub fn get_node(node: &FsNode, p: String) -> Option<FsNode> {
             Some(no) => {
                 i += 1;
                 if i == args.len() {
-                    Some(no.clone());
+                    return Some(no.clone());
                 } else {
                     n = no.clone();
                 }
@@ -200,7 +200,7 @@ pub fn write_fs(node: FsNode, offset: u32, size: u32, buffer: u8) -> u32 {
 }
 
 
-pub fn open_fs(node: FsNode, read: u8, write: u8) {
+
     match node.system {
         System::Initrd => initrd::INITRD.lock().open(node, read, write),
         None => (),

@@ -1,5 +1,6 @@
 extern crate alloc;
 
+use crate::vfs;
 use alloc::string::{ToString, String};
 use crate::stdin;
 use lazy_static::lazy_static;
@@ -10,39 +11,42 @@ use crate::commands;
 use crate::vga_buffer;
 
 pub struct Console {
-    prompt: &'static str,
+    WD: vfs::FsNode,
 }
 
 lazy_static! {
     pub static ref CONSOLE: Mutex<Console> = Mutex::new(Console {
-        prompt: ">>> ",
+        WD: vfs::FS_ROOT.lock().node.clone(),   
     });
 }
 
-impl Console {
 
-    pub fn prompt(&mut self) {
-        vga_buffer::WRITER.lock().set_color(vga_buffer::Color::LightCyan, vga_buffer::Color::Black);
-        print!("{}", self.prompt);
-        vga_buffer::WRITER.lock().set_color(vga_buffer::Color::White, vga_buffer::Color::Black);
+pub fn prompt() {
+    print!("{}", &CONSOLE.lock().WD.name);
+    vga_buffer::WRITER.lock().set_color(vga_buffer::Color::LightCyan, vga_buffer::Color::Black);
+    print!(" >>> ");
+    vga_buffer::WRITER.lock().set_color(vga_buffer::Color::White, vga_buffer::Color::Black);
 
-        unsafe { stdin::BUF.force_unlock(); }
-        stdin::BUF.lock().set_func(proc_wrapper);
-        stdin::BUF.lock().read_line();
-    }
+    unsafe { stdin::BUF.force_unlock(); }
+    stdin::BUF.lock().set_func(process_command);
+    stdin::BUF.lock().read_line();
+}
 
-    pub fn process_command(&mut self, com: String) {
-        if com == String::from("\n") {
-            self.prompt();
-        } else {
-            let args: Vec<String> = com.split_whitespace().map(|s| s.to_string()).collect();
-            commands::get_command(args.first().unwrap().to_string(), args); 
-            self.prompt();
-        }
+pub fn process_command(com: String) {
+    if com == String::from("\n") {
+        prompt();
+    } else {
+        let args: Vec<String> = com.split_whitespace().map(|s| s.to_string()).collect();
+        commands::get_command(args.first().unwrap().to_string(), args); 
+        prompt();
     }
 }
 
-pub fn proc_wrapper(c: String) {
-    CONSOLE.lock().process_command(c);
+pub fn get_wd() -> vfs::FsNode {
+    CONSOLE.lock().WD.clone()
+}
+
+pub fn set_wd(node: &vfs::FsNode) {
+    CONSOLE.lock().WD = node.clone();
 }
 
