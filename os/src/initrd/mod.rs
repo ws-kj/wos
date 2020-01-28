@@ -1,20 +1,20 @@
-use crate::initrd_img;
 use crate::vfs;
 use spin::Mutex;
 use lazy_static::lazy_static;
 use alloc::vec::Vec;
 use core::mem;
 use alloc::string::String;
+use core::ptr;
+
+pub mod initrd_img;
 
 #[repr(C)]
 pub struct Initrd {
     pub nfiles: u8,
     pub file_headers: Vec<FileHeader>,
     pub root: vfs::FsNode,
-    pub dev: vfs::FsNode,
     pub root_nodes: Vec<vfs::FsNode>,
     pub nroot_nodes: u32,
-    pub dirent: vfs::Dirent,
 }
 
 #[repr(C)]
@@ -32,27 +32,14 @@ lazy_static! {
         root: vfs::FsNode {
             name: String::from("Init"),
             system: vfs::System::Initrd,
-            mask: 0,
             flags: vfs::FS_DIR,
             inode: 0,
             length: 0,
             children: Vec::new(),
-        },
-        dev: vfs::FsNode {
-            name: String::from("Dev"),
-            system: vfs::System::Initrd,
-            mask: 0,
-            flags: vfs::FS_DIR,
-            inode: 0,
-            length: 0,
-            children: Vec::new(),
+            parent: ptr::null_mut(),
         },
         root_nodes: Vec::new(),
         nroot_nodes: 0,
-        dirent: vfs::Dirent {
-            name: String::from(""),
-            ino: 0,
-        },
     });
 }
 
@@ -67,8 +54,7 @@ pub fn init() {
  
     INITRD.lock().nroot_nodes = initrd_img::IMG[0] as u32;
 
-    vfs::FS_ROOT.lock().node.children.push(&INITRD.lock().dev as *const vfs::FsNode);
-    vfs::FS_ROOT.lock().node.children.push(&INITRD.lock().root as *const vfs::FsNode);
+    vfs::add_child(&mut vfs::FS_ROOT.lock().node, &mut INITRD.lock().root);
 
     let mut offset = 1;
     for i in 0..INITRD.lock().nroot_nodes {
@@ -85,23 +71,21 @@ pub fn init() {
         let node = vfs::FsNode {
             name: String::from(&osfn(header.name)),
             system: vfs::System::Initrd,
-            mask: 0,
             flags: vfs::FS_FILE,
             inode: i as u32,
             length: header.size,
             children: Vec::new(),
+            parent: ptr::null_mut(),
         };
         INITRD.lock().root_nodes.push(node);
-        //println!("{}", vfs::get_nth_child(&vfs::FS_ROOT.lock().node, i as usize + 2).unwrap().name);
         offset += header_size;
     }
 
     for i in 0..INITRD.lock().root_nodes.len() {
         unsafe { INITRD.force_unlock() }
-        let n = &INITRD.lock().root_nodes[i as usize];
-        vfs::FS_ROOT.lock().node.children.push(n as *const vfs::FsNode);
+        let n = &mut INITRD.lock().root_nodes[i as usize];
+        vfs::add_child(&mut vfs::FS_ROOT.lock().node, n);
     }
-    //println!("{}", str::from_utf8(&initrd_img::IMG[offset..initrd_img::IMG.len()]).unwrap());
 }
 
 pub fn osfn(name: [char; 30]) -> String {

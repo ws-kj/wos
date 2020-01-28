@@ -36,7 +36,6 @@ pub mod vfs;
 pub mod initrd;
 pub mod cmos;
 pub mod timer;
-pub mod initrd_img;
 
 #[global_allocator]
 static ALLOCATOR: LockedHeap = LockedHeap::empty();

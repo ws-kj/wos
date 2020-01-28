@@ -135,16 +135,14 @@ pub fn read_fn(args: Vec<String>) {
         return ();
     }
 
-    //let node = vfs::finddir_fs(&initrd::INITRD.lock().dev, args[1].clone());
-    
-    let node = vfs::get_child(&vfs::FS_ROOT.lock().node, args[1].clone());
-
+    //let node = vfs::get_child(&vfs::FS_ROOT.lock().node, args[1].clone());
+    let node = vfs::get_node_from_path(args[1].clone());
     match node {
         Some(n) => {
             if (n.flags&0x7 == vfs::FS_DIR) && n.length == 0 {
                 println!("{} is a directory", n.name);
             } else {
-                println!("{}", str::from_utf8(&vfs::read_fs(n)).unwrap());
+                println!("{}", str::from_utf8(&vfs::read(n)).unwrap());
             }
         },
         None => println!("file not found: {}", &args[1]),
@@ -152,15 +150,14 @@ pub fn read_fn(args: Vec<String>) {
 }
 
 pub fn info_fn(args: Vec<String>) {
-
-    //println!("{}", vfs::get_nth_child(&initrd::INITRD.lock().root, 0).unwrap().name);
     for i in 1..args.len() {
-        let node = vfs::get_child(&vfs::FS_ROOT.lock().node, args[i].clone());
+        let node = vfs::get_node_from_path(args[i].clone());
         match node {
             Some(n) => {
                 println!("file: {}", n.name);
                 println!("    flags: {}", n.flags);
                 println!("    length: {}B", n.length);
+                println!("    children: {}", n.children.len());
             },
             None => println!("file not found: {}", &args[i]),
         }

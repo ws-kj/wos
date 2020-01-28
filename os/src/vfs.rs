@@ -1,8 +1,11 @@
 use lazy_static::lazy_static;
 use spin::Mutex;
 use crate::initrd;
-use alloc::string::String;
+use alloc::string::{ToString, String};
 use alloc::vec::Vec;
+use alloc::slice::SliceConcatExt;
+use core::ptr;
+use crate::println;
 
 pub const FS_FILE: u32      = 0x01;
 pub const FS_DIR: u32       = 0x02;
@@ -21,49 +24,127 @@ pub struct FsRoot {
     pub node: FsNode,
 }
 
-pub struct CDir {
-    pub dirent: Dirent,
-}
-
 lazy_static! {
     pub static ref FS_ROOT: Mutex<FsRoot> = Mutex::new(FsRoot { node: FsNode {
         name: String::from("/"),
         system: System::Initrd,
-        mask: 0,
         flags: 2,
         inode: 0,
         length: 0,
         children: Vec::new(),
-    }});
-
-    pub static ref CDIR: Mutex<CDir> = Mutex::new(CDir { dirent: Dirent {
-        name: FS_ROOT.lock().node.name.clone(),
-        ino: FS_ROOT.lock().node.inode,
+        parent: ptr::null_mut(),
     }});
 }
 
-#[derive(Clone)]
-#[repr(C)]
-pub struct Dirent {
-    pub name: String,
-    pub ino:  u32,
-}
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 #[repr(C)]
 pub struct FsNode {
     pub name:   String,
     pub system: System,
-    pub mask:   u32,
     pub flags:  u32,
     pub inode:  u32,
     pub length: u32,
-    pub children: Vec<*const FsNode>,
+    pub children: Vec<*mut FsNode>,
+    pub parent: *mut FsNode,
 }
 
 unsafe impl Send for FsNode {}
 
-pub fn read_fs(node: FsNode) -> &'static [u8] {
+pub fn get_node_from_path(p: String) -> Option<FsNode> {
+    let mut path = p;
+    if path == String::from("/") { return Some(FS_ROOT.lock().node.clone()); }
+    if path.chars().nth(&path.chars().count() - 1).unwrap() == '/' {
+        let t = String::from(&path[0..&path.chars().count()-1]);
+        path = t.clone();
+    }
+    let mut args: Vec<String> = path.split("/").map(|s| s.to_string()).collect();
+    if args.len() == 0 { return None; }
+
+    for i in 0..args.len() - 1 {
+        if args[i] == "" {
+            args.remove(i);
+        }
+    }
+
+
+    let mut i = 0;
+    let mut node = FS_ROOT.lock().node.clone();
+    loop {
+        match get_child(&node, args[i].clone()) {
+            Some(n) => {
+                node = n;
+                i += 1;
+                if i == args.len() {
+                    return Some(node);
+                }
+            },
+            None => break,
+        }
+    }
+    None
+}
+pub fn get_node(node: &FsNode, p: String) -> Option<FsNode> {
+    let mut path = p;
+
+    if path == String::from("/") { return Some(FS_ROOT.lock().node.clone()); }
+    if path.chars().nth(&path.chars().count() - 1).unwrap() == '/' {
+        let t = String::from(&path[0..&path.chars().count()-1]);
+        path = t.clone();
+    }
+    let mut args: Vec<String> = path.split("/").map(|s| s.to_string()).collect();
+    if args.len() == 0 { return None; }
+
+    for i in 0..args.len() - 1 {
+        if args[i] == "" {
+            args.remove(i);
+        }
+    }
+    let mut i = 0;
+    let mut n = node.clone();
+    if path.chars().nth(0).unwrap() == '/' {
+        match get_node_from_path(path) {
+            Some(no) => Some(no),
+            None => None,
+        };
+    }
+
+    loop {
+        if args[i] == ".." {
+            unsafe { FS_ROOT.force_unlock() }
+            if &n == &FS_ROOT.lock().node {
+                args.remove(i);
+                continue;
+            }
+            unsafe {
+                let g = (*n.clone().parent).clone();
+                n = g;
+                i += 1;
+            }
+        }
+        
+        if i >= args.len() {
+            return Some(n);
+        }
+
+        match get_child(&n, args[i].clone()) {
+            Some(no) => {
+                i += 1;
+                if i == args.len() {
+                    Some(no.clone());
+                } else {
+                    n = no.clone();
+                }
+            },
+            None => break,
+        }
+
+    }
+
+    None
+}
+
+pub fn read(node: FsNode) -> &'static [u8] {
     match node.system {
         System::Initrd => initrd::read(node),
     }
@@ -78,7 +159,7 @@ pub fn get_child(node: &FsNode, name: String) -> Option<FsNode> {
                 }
             }
         }
-       return None;
+        return None;
     } else {
         return None;
     }
@@ -92,6 +173,24 @@ pub fn get_nth_child(node: &FsNode, index: usize) -> Option<FsNode> {
     }
 }
 
+pub fn add_child(parent: &mut FsNode, node: &mut FsNode) {
+    node.parent = parent as *mut FsNode;
+    parent.children.push(node as *mut FsNode);
+}
+
+/*pub fn reparent(node: &mut FsNode, np: &mut FsNode) {
+    unsafe {
+        let p = &mut (*node.parent);
+        for i in 0..p.children.len() {
+            if (*p.children[i]) == *node {
+                *p.children.remove(i);
+            }
+        }
+        node.parent = p as *mut FsNode;
+        p.children.push(node as *mut FsNode);
+    }
+}
+*/
 /*
 TODO: Implement write, open, and close for InitRD
 pub fn write_fs(node: FsNode, offset: u32, size: u32, buffer: u8) -> u32 {
