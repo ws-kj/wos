@@ -3,9 +3,7 @@ use spin::Mutex;
 use crate::initrd;
 use alloc::string::{ToString, String};
 use alloc::vec::Vec;
-use alloc::slice::SliceConcatExt;
 use core::ptr;
-use crate::println;
 
 pub const FS_FILE: u32      = 0x01;
 pub const FS_DIR: u32       = 0x02;
@@ -51,9 +49,9 @@ pub struct FsNode {
 
 unsafe impl Send for FsNode {}
 
-pub fn get_node_from_path(p: String) -> Option<FsNode> {
+pub fn get_node_from_path(p: String) -> Option<*mut FsNode> {
     let mut path = p;
-    if path == String::from("/") { return Some(FS_ROOT.lock().node.clone()); }
+    if path == String::from("/") { return Some(&mut FS_ROOT.lock().node); }
     if path.chars().nth(&path.chars().count() - 1).unwrap() == '/' {
         let t = String::from(&path[0..&path.chars().count()-1]);
         path = t.clone();
@@ -69,9 +67,9 @@ pub fn get_node_from_path(p: String) -> Option<FsNode> {
 
 
     let mut i = 0;
-    let mut node = FS_ROOT.lock().node.clone();
-    loop {
-        match get_child(&node, args[i].clone()) {
+    let mut node: *mut FsNode = &mut FS_ROOT.lock().node;
+    loop { unsafe {
+        match get_child(&(*node), args[i].clone()) {
             Some(n) => {
                 node = n;
                 i += 1;
@@ -81,13 +79,13 @@ pub fn get_node_from_path(p: String) -> Option<FsNode> {
             },
             None => break,
         }
-    }
+    }}
     None
 }
-pub fn get_node(node: &FsNode, p: String) -> Option<FsNode> {
+pub fn get_node(node: &mut FsNode, p: String) -> Option<*mut FsNode> {
     let mut path = p;
 
-    if path == String::from("/") { return Some(FS_ROOT.lock().node.clone()); }
+    if path == String::from("/") { return Some(&mut FS_ROOT.lock().node); }
     if path.chars().nth(&path.chars().count() - 1).unwrap() == '/' {
         let t = String::from(&path[0..&path.chars().count()-1]);
         path = t.clone();
@@ -101,7 +99,7 @@ pub fn get_node(node: &FsNode, p: String) -> Option<FsNode> {
         }
     }
     let mut i = 0;
-    let mut n = node.clone();
+    let mut n: *mut FsNode = node;
     if path.chars().nth(0).unwrap() == '/' {
         match get_node_from_path(path) {
             Some(no) => Some(no),
@@ -109,25 +107,23 @@ pub fn get_node(node: &FsNode, p: String) -> Option<FsNode> {
         };
     }
 
-    loop {
+    loop { unsafe {
         if args[i] == ".." {
-            unsafe { FS_ROOT.force_unlock() }
-            if &n == &FS_ROOT.lock().node {
+            FS_ROOT.force_unlock();
+            if n == &mut FS_ROOT.lock().node {
                 args.remove(i);
                 continue;
             }
-            unsafe {
-                let g = (*n.clone().parent).clone();
-                n = g;
-                i += 1;
-            }
+            let g = (*n).parent;
+            n = g;
+            i += 1;
         }
         
         if i >= args.len() {
             return Some(n);
         }
 
-        match get_child(&n, args[i].clone()) {
+        match get_child(&(*n), args[i].clone()) {
             Some(no) => {
                 i += 1;
                 if i == args.len() {
@@ -139,23 +135,23 @@ pub fn get_node(node: &FsNode, p: String) -> Option<FsNode> {
             None => break,
         }
 
-    }
+    }}
 
     None
 }
 
-pub fn read(node: FsNode) -> &'static [u8] {
+pub fn read(node: &FsNode) -> &'static [u8] {
     match node.system {
         System::Initrd => initrd::read(node),
     }
 }
 
-pub fn get_child(node: &FsNode, name: String) -> Option<FsNode> {
+pub fn get_child(node: &FsNode, name: String) -> Option<*mut FsNode> {
     if node.children.len() > 0 {
        for i in 0..node.children.len() {
            unsafe {
                if (*node.children[i]).name == name {
-                   return Some((*node.children[i]).clone());
+                   return Some(node.children[i]);
                 }
             }
         }
@@ -165,9 +161,9 @@ pub fn get_child(node: &FsNode, name: String) -> Option<FsNode> {
     }
 }
 
-pub fn get_nth_child(node: &FsNode, index: usize) -> Option<FsNode> {
+pub fn get_nth_child(node: &FsNode, index: usize) -> Option<*mut FsNode> {
     if node.children.len() != 0 && node.children.len() >= index + 1 {
-        unsafe { Some((*node.children[index]).clone()) }
+        Some(node.children[index]) 
     } else {
         None
     }

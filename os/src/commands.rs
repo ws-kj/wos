@@ -135,19 +135,18 @@ pub fn ls_fn(args: Vec<String>) {
 
     let mut node = console::get_wd();
 
-    if args.len() > 1 {
-        match vfs::get_node(&console::get_wd(), args[1].clone()) {
-            Some(n) => node = n.clone(),
+    if args.len() > 1 { unsafe {
+        match vfs::get_node(&mut(*console::get_wd()), args[1].clone()) {
+            Some(n) => node = n,
             None => {
                 println!("file not found: {}", &args[1]);
                 return ();
             },
         }
-    }
+    }}
 
-
-    for c in node.children.iter() {
-        unsafe {
+    unsafe {
+        for c in (*node).children.iter() {
             print!("{}", (*(*c)).name);
             if (*(*c)).flags&0x7 == vfs::FS_DIR {
                 println!("/");
@@ -165,47 +164,51 @@ pub fn read_fn(args: Vec<String>) {
     }
 
     //let node = vfs::get_child(&vfs::FS_ROOT.lock().node, args[1].clone());
-    let node = vfs::get_node(&console::get_wd(), args[1].clone());
-    match node {
-        Some(n) => {
-            if (n.flags&0x7 == vfs::FS_DIR) && n.length == 0 {
-                println!("{} is a directory", n.name);
-            } else {
-                println!("{}", str::from_utf8(&vfs::read(n)).unwrap());
-            }
-        },
-        None => println!("file not found: {}", &args[1]),
+    unsafe {
+        let node = vfs::get_node(&mut(*console::get_wd()), args[1].clone());
+        match node {
+            Some(n) => {
+                if ((*n).flags&0x7 == vfs::FS_DIR) && (*n).length == 0 {
+                    println!("{} is a directory", (*n).name);
+                } else {
+                    println!("{}", str::from_utf8(&vfs::read(&mut(*n))).unwrap());
+                }
+            },
+            None => println!("file not found: {}", &args[1]),
+        }
     }
 }
 
 pub fn info_fn(args: Vec<String>) {
-    for i in 1..args.len() {
-        let node = vfs::get_node(&console::get_wd(), args[i].clone());
+    for i in 1..args.len() { unsafe {
+        let node = vfs::get_node(&mut(*console::get_wd()), args[i].clone());
         match node {
-            Some(n) => {
-                println!("file: {}", n.name);
-                println!("    flags: {}", n.flags);
-                println!("    length: {}B", n.length);
-                println!("    children: {}", n.children.len());
+            Some(n) => { 
+                println!("file: {}", (*n).name);
+                println!("    flags: {}", (*n).flags);
+                println!("    length: {}B", (*n).length);
+                println!("    children: {}", (*n).children.len());
             },
             None => println!("file not found: {}", &args[i]),
         }
         println!(); 
-    }
+    }}
 }
 
 pub fn pwd_fn(args: Vec<String>) {
-    println!("{}", &console::get_wd().name);
+    unsafe { println!("{}", (*console::get_wd()).name); }
 }
 
 pub fn cd_fn(args: Vec<String>) {
     if args.len() == 1 { 
-        console::set_wd(&vfs::FS_ROOT.lock().node);
+        console::set_wd(&mut vfs::FS_ROOT.lock().node);
         return ();
     }
 
-    match vfs::get_node(&console::get_wd(), args[1].clone()) {
-        Some(n) => console::set_wd(&n),
-        None => println!("file not found: {}", &args[1]),
+    unsafe { 
+        match vfs::get_node(&mut(*console::get_wd()), args[1].clone()) {
+            Some(n) => console::set_wd(&mut(*n)),
+            None => println!("file not found: {}", &args[1]),
+        }
     }
 }

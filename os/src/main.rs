@@ -14,8 +14,6 @@ use os::vga_buffer;
 use os::commands;
 use os::cmos;
 use os::initrd;
-use os::vfs;
-use alloc::string::String;
 
 entry_point!(kernel_main);
 
@@ -41,7 +39,6 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
     println!("wOS v0.1.0    {}", cmos::RTC.lock().get_datetime());
     println!("kernel debug console - enter 'help' for a list of commands\n");
-    
     console::prompt();
     os::hlt_loop();
 }

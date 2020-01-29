@@ -11,23 +11,25 @@ use crate::commands;
 use crate::vga_buffer;
 
 pub struct Console {
-    WD: vfs::FsNode,
+    wd: *mut vfs::FsNode,
 }
+unsafe impl Send for Console {}
 
 lazy_static! {
     pub static ref CONSOLE: Mutex<Console> = Mutex::new(Console {
-        WD: vfs::FS_ROOT.lock().node.clone(),   
+        wd: &mut vfs::FS_ROOT.lock().node,   
     });
 }
 
-
 pub fn prompt() {
-    print!("{}", &CONSOLE.lock().WD.name);
-    vga_buffer::WRITER.lock().set_color(vga_buffer::Color::LightCyan, vga_buffer::Color::Black);
-    print!(" >>> ");
-    vga_buffer::WRITER.lock().set_color(vga_buffer::Color::White, vga_buffer::Color::Black);
+    unsafe {
+        print!("{}", &(*CONSOLE.lock().wd).name);
+        vga_buffer::WRITER.lock().set_color(vga_buffer::Color::LightCyan, vga_buffer::Color::Black);
+        print!(" >>> ");
+        vga_buffer::WRITER.lock().set_color(vga_buffer::Color::White, vga_buffer::Color::Black);
 
-    unsafe { stdin::BUF.force_unlock(); }
+        stdin::BUF.force_unlock(); 
+    }
     stdin::BUF.lock().set_func(process_command);
     stdin::BUF.lock().read_line();
 }
@@ -42,11 +44,11 @@ pub fn process_command(com: String) {
     }
 }
 
-pub fn get_wd() -> vfs::FsNode {
-    CONSOLE.lock().WD.clone()
+pub fn get_wd() -> *mut vfs::FsNode {
+    CONSOLE.lock().wd
 }
 
-pub fn set_wd(node: &vfs::FsNode) {
-    CONSOLE.lock().WD = node.clone();
+pub fn set_wd(node: &mut vfs::FsNode) {
+    CONSOLE.lock().wd = node;
 }
 

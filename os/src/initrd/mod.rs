@@ -43,7 +43,7 @@ lazy_static! {
     });
 }
 
-pub fn read(node: vfs::FsNode) -> &'static [u8] {
+pub fn read(node: &vfs::FsNode) -> &'static [u8] {
     let header = INITRD.lock().file_headers[node.inode as usize];
     let buf = &initrd_img::IMG[(header.offset as usize)..header.offset as usize + header.size  as usize];
     buf
