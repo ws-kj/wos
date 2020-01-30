@@ -11,6 +11,7 @@ use crate::cmos;
 use crate::vfs;
 use core::str;
 use crate::console;
+use core::ptr;
 
 pub struct Command {
     com_name: String,
@@ -86,6 +87,13 @@ pub fn init() {
         func: cd_fn,
     };
     init_command(String::from("cd"), cd);
+
+    let mv = Command {
+        com_name: String::from("mv"),
+        desc: String::from("move file"),
+        func: mv_fn,
+    };
+    init_command(String::from("mv"), mv);
 }
 
 pub fn init_command(n: String, c: Command) {
@@ -212,3 +220,33 @@ pub fn cd_fn(args: Vec<String>) {
         }
     }
 }
+
+pub fn mv_fn(args: Vec<String>) { unsafe {
+    if args.len() != 3 {
+        println!("please specify a file and a destination");
+        return ();
+    }
+
+    let mut f: *mut vfs::FsNode = ptr::null_mut();
+    let mut d: *mut vfs::FsNode = ptr::null_mut();
+
+    match vfs::get_node(&mut(*console::get_wd()), args[1].clone()) {
+        Some(n) => f = n,
+        None => {
+            println!("file not found: {}", &args[1]);
+            return ();
+        },
+    }
+    match vfs::get_node(&mut(*console::get_wd()), args[2].clone()) {
+        Some(n) => d = n,
+        None => {
+            println!("file not found: {}", &args[2]);
+            return ();
+        },
+    }
+
+    vfs::reparent(f, d);
+}}
+
+
+
