@@ -24,6 +24,11 @@ lazy_static! {
 pub fn prompt() {
     unsafe {
         print!("{}", &(*CONSOLE.lock().wd).name);
+
+        if (*CONSOLE.lock().wd).name != String::from("/") {
+            print!("/");
+        }
+
         vga_buffer::WRITER.lock().set_color(vga_buffer::Color::LightCyan, vga_buffer::Color::Black);
         print!(" >>> ");
         vga_buffer::WRITER.lock().set_color(vga_buffer::Color::White, vga_buffer::Color::Black);

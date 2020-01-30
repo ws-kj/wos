@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 use core::mem;
 use alloc::string::String;
 use core::ptr;
-
+use crate::println;
 pub mod initrd_img;
 
 #[repr(C)]
@@ -85,6 +85,14 @@ pub fn init() {
         unsafe { INITRD.force_unlock() }
         let n = &mut INITRD.lock().root_nodes[i as usize];
         vfs::add_child(&mut vfs::FS_ROOT.lock().node, n);
+    }
+
+    for n in INITRD.lock().root_nodes.iter() {
+        unsafe { INITRD.force_unlock() }
+        vfs::reparent(
+            vfs::get_node_from_path(n.name.clone()).unwrap(),
+            vfs::get_node_from_path(String::from("Init")).unwrap(),
+        );
     }
 }
 

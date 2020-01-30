@@ -14,6 +14,8 @@ use os::vga_buffer;
 use os::commands;
 use os::cmos;
 use os::initrd;
+use os::vfs;
+use alloc::string::String;
 
 entry_point!(kernel_main);
 
@@ -31,11 +33,15 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
     allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap initialization failed"); 
     commands::init(); //we need to init after heap
-    initrd::init();
+
     #[cfg(test)]
     test_main();
    
     vga_buffer::WRITER.lock().clear_screen();
+
+    initrd::init();
+
+    //vfs::reparent(vfs::get_node_from_path(String::from("hello.txt")).unwrap(), vfs::get_node_from_path(String::from("Init")).unwrap());
 
     println!("wOS v0.1.0    {}", cmos::RTC.lock().get_datetime());
     println!("kernel debug console - enter 'help' for a list of commands\n");

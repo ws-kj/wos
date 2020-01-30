@@ -4,6 +4,7 @@ use crate::initrd;
 use alloc::string::{ToString, String};
 use alloc::vec::Vec;
 use core::ptr;
+use crate::println;
 
 pub const FS_FILE: u32      = 0x01;
 pub const FS_DIR: u32       = 0x02;
@@ -46,7 +47,6 @@ pub struct FsNode {
     pub children: Vec<*mut FsNode>,
     pub parent: *mut FsNode,
 }
-
 unsafe impl Send for FsNode {}
 
 pub fn get_node_from_path(p: String) -> Option<*mut FsNode> {
@@ -69,6 +69,7 @@ pub fn get_node_from_path(p: String) -> Option<*mut FsNode> {
     let mut i = 0;
     let mut node: *mut FsNode = &mut FS_ROOT.lock().node;
     loop { unsafe {
+        //println!("{} {}", i, args.len());
         match get_child(&(*node), args[i].clone()) {
             Some(n) => {
                 node = n;
@@ -174,19 +175,21 @@ pub fn add_child(parent: &mut FsNode, node: &mut FsNode) {
     parent.children.push(node as *mut FsNode);
 }
 
-/*pub fn reparent(node: &mut FsNode, np: &mut FsNode) {
+pub fn reparent(node: *mut FsNode, np: *mut FsNode) {
     unsafe {
-        let p = &mut (*node.parent);
-        for i in 0..p.children.len() {
-            if (*p.children[i]) == *node {
-                *p.children.remove(i);
+        let mut i = 0;
+        for n in (*(*node).parent).children.iter() {
+            if &(*(*n)).name == &(*node).name {
+                (*(*node).parent).children.remove(i);
+
+                (*node).parent = np;
+                (*np).children.push(node);
             }
+            i += 1;
         }
-        node.parent = p as *mut FsNode;
-        p.children.push(node as *mut FsNode);
     }
 }
-*/
+
 /*
 TODO: Implement write, open, and close for InitRD
 pub fn write_fs(node: FsNode, offset: u32, size: u32, buffer: u8) -> u32 {
