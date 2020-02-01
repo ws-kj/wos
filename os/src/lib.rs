@@ -20,7 +20,6 @@
 extern crate alloc;
 
 use core::panic::PanicInfo;
-use linked_list_allocator::LockedHeap;
 
 pub mod serial;
 pub mod vga_buffer;
@@ -37,8 +36,9 @@ pub mod initrd;
 pub mod cmos;
 pub mod timer;
 
+
 #[global_allocator]
-static ALLOCATOR: LockedHeap = LockedHeap::empty();
+static ALLOCATOR: allocator::Locked<allocator::bump::BumpAllocator> = allocator::Locked::new(allocator::bump::BumpAllocator::new());
 
 pub fn init() {
     gdt::init();
