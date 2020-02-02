@@ -2,7 +2,7 @@ use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 use crate::{print, println};
 use lazy_static::lazy_static;
 use crate::gdt;
-use pic8259_simple::ChainedPics;
+use crate::pic::ChainedPics;
 use spin;
 use crate::stdin;
 use crate::timer;

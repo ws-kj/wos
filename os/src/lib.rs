@@ -35,7 +35,7 @@ pub mod vfs;
 pub mod initrd;
 pub mod cmos;
 pub mod timer;
-
+pub mod pic;
 
 #[global_allocator]
 static ALLOCATOR: allocator::Locked<allocator::bump::BumpAllocator> = allocator::Locked::new(allocator::bump::BumpAllocator::new());
