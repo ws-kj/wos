@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 #![feature(custom_test_frameworks)]
+#![feature(asm)]
 #![test_runner(os::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
@@ -16,6 +17,8 @@ use os::cmos;
 use os::initrd;
 use os::vfs;
 use alloc::string::String;
+use os::ata;
+use os::io;
 
 entry_point!(kernel_main);
 
@@ -32,16 +35,15 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     };
 
     allocator::init_heap(&mut mapper, &mut frame_allocator).expect("heap initialization failed"); 
-    commands::init(); //we need to init after heap
 
     #[cfg(test)]
     test_main();
    
     vga_buffer::WRITER.lock().clear_screen();
 
+    commands::init();
     initrd::init();
-
-    //vfs::reparent(vfs::get_node_from_path(String::from("hello.txt")).unwrap(), vfs::get_node_from_path(String::from("Init")).unwrap());
+    ata::init();
 
     println!("wOS v0.1.0    {}", cmos::RTC.lock().get_datetime());
     println!("kernel debug console - enter 'help' for a list of commands\n");

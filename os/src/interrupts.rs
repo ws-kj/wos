@@ -15,6 +15,8 @@ pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
 pub enum InterruptIndex {
     Timer = PIC_1_OFFSET,
     Keyboard,
+    PrimaryATA = 14 + PIC_1_OFFSET,
+    SecondaryATA = 15 + PIC_1_OFFSET,
 }
 
 impl InterruptIndex {
@@ -45,6 +47,12 @@ lazy_static! {
             .set_handler_fn(keyboard_interrupt_handler);
 
         idt.page_fault.set_handler_fn(page_fault_handler);
+
+        idt[InterruptIndex::PrimaryATA.as_usize()]
+            .set_handler_fn(primary_ata_handler);
+
+        idt[InterruptIndex::SecondaryATA.as_usize()]
+            .set_handler_fn(secondary_ata_handler);
 
         idt
     };
@@ -114,6 +122,24 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(
     unsafe {
         PICS.lock()
             .notify_end_of_interrupt(InterruptIndex::Keyboard.as_u8());
+    }
+}
+
+extern "x86-interrupt" fn primary_ata_handler(
+    _stack_frame: &mut InterruptStackFrame)
+{
+    unsafe {
+        PICS.lock()
+            .notify_end_of_interrupt(InterruptIndex::PrimaryATA.as_u8());
+    }
+}
+
+extern "x86-interrupt" fn secondary_ata_handler(
+    _stack_frame: &mut InterruptStackFrame)
+{
+    unsafe {
+        PICS.lock()
+            .notify_end_of_interrupt(InterruptIndex::SecondaryATA.as_u8());
     }
 }
 

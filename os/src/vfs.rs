@@ -69,7 +69,6 @@ pub fn get_node_from_path(p: String) -> Option<*mut FsNode> {
     let mut i = 0;
     let mut node: *mut FsNode = &mut FS_ROOT.lock().node;
     loop { unsafe {
-        //println!("{} {}", i, args.len());
         match get_child(&(*node), args[i].clone()) {
             Some(n) => {
                 node = n;
