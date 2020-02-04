@@ -3,6 +3,8 @@ use crate::println;
 use crate::print;
 use crate::timer;
 use bit_field::BitField;
+use alloc::vec::Vec;
+use alloc::string::String;
 
 #[repr(u8)]
 pub enum ATACommand {
@@ -141,7 +143,8 @@ const WTG: usize = 6;
 
 pub fn init() {
     unsafe {
-        //asm!("cli");
+        let mut drives = 0;
+
         io::outb(DRIVESEL, 0xE0);
         io::outb(SECTOR_COUNT, 0);
         io::outb(LBAL, 0);
@@ -149,39 +152,103 @@ pub fn init() {
         io::outb(LBAH, 0);
         io::outb(COMMAND, ATACommand::IdentifyDevice as u8);
 
-        if io::inb(STATUS) == 0 {
-            println!("ATA: master not found");
+        if io::inb(STATUS) == 0 || io::inb(STATUS) == 0xFF {
+            println!("ATA: master not found.");
         } else {
-            println!("ATA: master found");
+            println!("ATA: master found. STATUS = {}", io::inb(STATUS));
+            drives += 1;
         }
-        println!("{}", io::inb(STATUS));
-        io::outb(DRIVESEL, 0xF0);
 
+        io::outb(DRIVESEL, 0xF0);
         io::outb(SECTOR_COUNT, 0);
         io::outb(LBAL, 0);
         io::outb(LBAM, 0);
         io::outb(LBAH, 0);
         io::outb(COMMAND, ATACommand::IdentifyDevice as u8);
 
-        if io::inb(STATUS) == 0 {
-            println!("ATA: slave not found");
+        if io::inb(STATUS) == 0 || io::inb(STATUS) == 0xFF {
+            println!("ATA: slave not found.");
         } else {
-            println!("ATA: slave found");
+            println!("ATA: slave found. STATUS = {}", io::inb(STATUS));
+            drives += 1;
         }
-        
-        println!("{}", io::inb(STATUS));
+
+        if drives < 1 {
+            println!("ATA: no drives found. Aborting.\n");
+            return;
+        }
 
         while io::inb(STATUS).get_bit(BSY) { crate::hlt_loop(); }
 
+        let mut raw: [u16; 256] = [0; 256];
         if io::inb(STATUS).get_bit(DRQ) && !io::inb(STATUS).get_bit(ERR) {
-            let mut data: [u16; 256] = [0; 256];
-            for i in 0..data.len() {
-                data[i] = io::inw(DATA);
-                print!("{}", data[i]);
+            for i in raw.iter_mut() {
+                *i = io::inw(DATA);
             }
         } else {
             println!("ATA: read error");
             return;
         }
+        println!();
+
+        let total_sectors_lba28 = {
+            let (lobytes, hibytes) = (raw[60].to_le_bytes(), raw[61].to_le_bytes());
+            u32::from_le_bytes([lobytes[0], lobytes[1], hibytes[0], hibytes[1]])
+        };
+        println!("ATA: total LBA28 sectors: {}", total_sectors_lba28);
+
+		let total_sectors_lba48 = {
+		    let (lobytes, hibytes) = (
+		        [raw[100].to_le_bytes(), raw[101].to_le_bytes()],
+		        [raw[102].to_le_bytes(), raw[103].to_le_bytes()],
+		    );
+		    u64::from_le_bytes([
+		        lobytes[0][0],
+		        lobytes[0][1],
+		        lobytes[1][0],
+		        lobytes[1][1],
+		        hibytes[0][0],
+		        hibytes[0][1],
+		        hibytes[1][0],
+		        hibytes[1][1],
+		    ])
+		};
+		println!("ATA: total LBA48 sectors: {}", total_sectors_lba48);
+		
+	    let model_number = {
+		    let mut bytes: Vec<u8> = Vec::new();
+		    for i in 27..47 {
+		        let part = raw[i].to_le_bytes();
+		        bytes.push(part[0]);
+		        bytes.push(part[1]);
+		    }
+		    // Swap the bytes
+		    for i in (0..bytes.len()).step_by(2) {
+		        let tmp = bytes[i];
+		        bytes[i] = bytes[i + 1];
+		        bytes[i + 1] = tmp;
+		    }
+		    String::from_utf8(bytes).unwrap()
+    	};
+		println!("ATA: model number: {}", model_number);
+
+    	let current_media_sn = {
+		    let mut bytes: Vec<u8> = Vec::new();
+		    for i in 176..206 {
+		        let part = raw[i].to_le_bytes();
+		        bytes.push(part[0]);
+		        bytes.push(part[1]);
+		    }
+		    // Swap the bytes
+		    for i in (0..bytes.len()).step_by(2) {
+		        let tmp = bytes[i];
+		        bytes[i] = bytes[i + 1];
+		        bytes[i + 1] = tmp;
+		    }
+		    String::from_utf8(bytes).unwrap()
+    	};
+		println!("ATA: serial number: {}", current_media_sn);
+
     }
+    println!();
 }
