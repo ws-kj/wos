@@ -39,7 +39,7 @@ impl ChainedPics {
     }
 
     pub unsafe fn initialize(&mut self) {
-        let mut wait = || { io::outb(0x80, 0) };
+        let wait = || { io::outb(0x80, 0) };
 
         let saved_mask1 = io::inb(self.pics[0].data_port);
         let saved_mask2 = io::inb(self.pics[1].data_port);

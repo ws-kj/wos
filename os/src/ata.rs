@@ -1,10 +1,13 @@
 use crate::io;
 use crate::println;
 use crate::print;
-use crate::timer;
 use bit_field::BitField;
 use alloc::vec::Vec;
 use alloc::string::String;
+use alloc::collections::linked_list::LinkedList;
+use crate::timer;
+use core::str;
+use alloc::string::ToString;
 
 #[repr(u8)]
 pub enum ATACommand {
@@ -153,9 +156,9 @@ pub fn init() {
         io::outb(COMMAND, ATACommand::IdentifyDevice as u8);
 
         if io::inb(STATUS) == 0 || io::inb(STATUS) == 0xFF {
-            println!("ATA: master not found.");
+            println!("[ATA] master not found.");
         } else {
-            println!("ATA: master found. STATUS = {}", io::inb(STATUS));
+            println!("[ATA] master found");
             drives += 1;
         }
 
@@ -167,17 +170,23 @@ pub fn init() {
         io::outb(COMMAND, ATACommand::IdentifyDevice as u8);
 
         if io::inb(STATUS) == 0 || io::inb(STATUS) == 0xFF {
-            println!("ATA: slave not found.");
+            println!("[ATA] slave not found.");
         } else {
-            println!("ATA: slave found. STATUS = {}", io::inb(STATUS));
+            println!("[ATA] slave found");
             drives += 1;
         }
 
         if drives < 1 {
-            println!("ATA: no drives found. Aborting.\n");
+            println!("[ATA] no drives found. Aborting.\n");
             return;
         }
 
+        identify_drive();
+    }
+}
+
+pub fn identify_drive() {
+    unsafe {
         while io::inb(STATUS).get_bit(BSY) { crate::hlt_loop(); }
 
         let mut raw: [u16; 256] = [0; 256];
@@ -186,35 +195,16 @@ pub fn init() {
                 *i = io::inw(DATA);
             }
         } else {
-            println!("ATA: read error");
+            println!("[ATA] read error");
             return;
         }
-        println!();
 
         let total_sectors_lba28 = {
             let (lobytes, hibytes) = (raw[60].to_le_bytes(), raw[61].to_le_bytes());
             u32::from_le_bytes([lobytes[0], lobytes[1], hibytes[0], hibytes[1]])
         };
-        println!("ATA: total LBA28 sectors: {}", total_sectors_lba28);
+        println!("[ATA] total LBA28 sectors: {}", total_sectors_lba28);
 
-		let total_sectors_lba48 = {
-		    let (lobytes, hibytes) = (
-		        [raw[100].to_le_bytes(), raw[101].to_le_bytes()],
-		        [raw[102].to_le_bytes(), raw[103].to_le_bytes()],
-		    );
-		    u64::from_le_bytes([
-		        lobytes[0][0],
-		        lobytes[0][1],
-		        lobytes[1][0],
-		        lobytes[1][1],
-		        hibytes[0][0],
-		        hibytes[0][1],
-		        hibytes[1][0],
-		        hibytes[1][1],
-		    ])
-		};
-		println!("ATA: total LBA48 sectors: {}", total_sectors_lba48);
-		
 	    let model_number = {
 		    let mut bytes: Vec<u8> = Vec::new();
 		    for i in 27..47 {
@@ -222,7 +212,6 @@ pub fn init() {
 		        bytes.push(part[0]);
 		        bytes.push(part[1]);
 		    }
-		    // Swap the bytes
 		    for i in (0..bytes.len()).step_by(2) {
 		        let tmp = bytes[i];
 		        bytes[i] = bytes[i + 1];
@@ -230,25 +219,95 @@ pub fn init() {
 		    }
 		    String::from_utf8(bytes).unwrap()
     	};
-		println!("ATA: model number: {}", model_number);
-
-    	let current_media_sn = {
-		    let mut bytes: Vec<u8> = Vec::new();
-		    for i in 176..206 {
-		        let part = raw[i].to_le_bytes();
-		        bytes.push(part[0]);
-		        bytes.push(part[1]);
-		    }
-		    // Swap the bytes
-		    for i in (0..bytes.len()).step_by(2) {
-		        let tmp = bytes[i];
-		        bytes[i] = bytes[i + 1];
-		        bytes[i + 1] = tmp;
-		    }
-		    String::from_utf8(bytes).unwrap()
-    	};
-		println!("ATA: serial number: {}", current_media_sn);
+		println!("[ATA] model: {}", model_number);
 
     }
     println!();
+}
+
+pub fn pio28_read(master: bool, lba: usize, count: u8) -> [u8; 512] {
+    unsafe {
+        if master {
+            io::outb(DRIVESEL, 0xE0);
+        } else {
+            io::outb(DRIVESEL, 0xF0);
+        }
+
+        io::outb(FEATURES, 0x00);
+        io::outb(SECTOR_COUNT, count);
+        io::outb(LBAL, lba.get_bits(24..32) as u8);
+        io::outb(LBAM, lba.get_bits(32..40) as u8);
+        io::outb(LBAH, lba.get_bits(40..48) as u8);
+
+        io::outb(SECTOR_COUNT, count.get_bits(0..8) as u8);
+        io::outb(LBAL, lba.get_bits(0..8) as u8);
+        io::outb(LBAM, lba.get_bits(8..16) as u8);
+        io::outb(LBAH, lba.get_bits(16..24) as u8);
+
+        io::outb(COMMAND, ATACommand::ReadSectors as u8);
+        
+        timer::wait(1);
+        while io::inb(STATUS).get_bit(BSY) { crate::hlt_loop(); }
+
+        let mut bytes: LinkedList<u8> = LinkedList::new();
+        for _ in 0..256 {
+            let rawbytes = io::inw(DATA).to_le_bytes();
+            bytes.push_back(rawbytes[0]);
+            bytes.push_back(rawbytes[1]);
+        }
+        let mut sector: [u8; 512] = [0; 512];
+        for i in bytes.iter().zip(sector.iter_mut()) {
+            let (byte, sector) = i;
+            *sector = *byte;
+        }
+        drop(bytes);
+        return sector;
+    }
+}
+    
+pub fn pio28_write(master: bool, lba: usize, count: u8, sec: [u8; 512]) {
+    unsafe {
+        let mut buf: [u16; 256] = [0; 256];
+
+        let mut j = 0;
+        for i in 0..256 {
+            buf[i] = u16::from_le_bytes([sec[j], sec[j+1]]);
+            j += 2;
+        }
+
+        if master {
+            io::outb(DRIVESEL, 0xE0);
+        } else {
+            io::outb(DRIVESEL, 0xF0);
+        }
+
+        io::outb(FEATURES, 0x00);
+        io::outb(SECTOR_COUNT, count);
+        io::outb(LBAL, lba.get_bits(24..32) as u8);
+        io::outb(LBAM, lba.get_bits(32..40) as u8);
+        io::outb(LBAH, lba.get_bits(40..48) as u8);
+
+        io::outb(SECTOR_COUNT, count.get_bits(0..8) as u8);
+        io::outb(LBAL, lba.get_bits(0..8) as u8);
+        io::outb(LBAM, lba.get_bits(8..16) as u8);
+        io::outb(LBAH, lba.get_bits(16..24) as u8);
+        
+        timer::wait(1);
+        while io::inb(STATUS).get_bit(BSY) { crate::hlt_loop(); }
+
+        io::outb(COMMAND, ATACommand::WriteSectors as u8);
+            
+        for i in 0..256 {
+            io::outw(DATA, buf[i]);
+        }
+    }
+}
+
+fn delay() {
+    unsafe {
+        io::inb(STATUS);
+        io::inb(STATUS);
+        io::inb(STATUS);
+        io::inb(STATUS);
+    }
 }

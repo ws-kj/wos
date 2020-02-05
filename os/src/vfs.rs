@@ -4,7 +4,6 @@ use crate::initrd;
 use alloc::string::{ToString, String};
 use alloc::vec::Vec;
 use core::ptr;
-use crate::println;
 
 pub const FS_FILE: u32      = 0x01;
 pub const FS_DIR: u32       = 0x02;

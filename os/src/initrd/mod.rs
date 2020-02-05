@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 use core::mem;
 use alloc::string::String;
 use core::ptr;
-use crate::println;
+
 pub mod initrd_img;
 
 #[repr(C)]

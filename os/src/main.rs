@@ -15,10 +15,7 @@ use os::vga_buffer;
 use os::commands;
 use os::cmos;
 use os::initrd;
-use os::vfs;
-use alloc::string::String;
 use os::ata;
-use os::io;
 
 entry_point!(kernel_main);
 
