@@ -33,10 +33,10 @@ pub mod console;
 pub mod commands;
 pub mod vfs;
 pub mod initrd;
-pub mod cmos;
 pub mod timer;
 pub mod pic;
-pub mod ata;
+pub mod drivers;
+pub mod wfs;
 
 #[global_allocator]
 static ALLOCATOR: allocator::Locked<allocator::bump::BumpAllocator> = allocator::Locked::new(allocator::bump::BumpAllocator::new());

@@ -7,7 +7,7 @@ use alloc::string::String;
 use crate::vga_buffer;
 use crate::println;
 use crate::print;
-use crate::cmos;
+use crate::drivers::cmos;
 use crate::vfs;
 use core::str;
 use crate::console;

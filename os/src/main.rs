@@ -13,9 +13,10 @@ use os::console;
 use bootloader::{entry_point, BootInfo};
 use os::vga_buffer;
 use os::commands;
-use os::cmos;
+use os::drivers::cmos;
 use os::initrd;
-use os::ata;
+use os::drivers::ata;
+use os::wfs;
 
 entry_point!(kernel_main);
 
@@ -41,7 +42,9 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     commands::init();
     initrd::init();
     ata::init();
+    wfs::init();
 
+    println!("");
     println!("wOS v0.1.0    {}", cmos::RTC.lock().get_datetime());
     println!("kernel debug console - enter 'help' for a list of commands\n");
     console::prompt();

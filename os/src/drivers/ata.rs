@@ -8,6 +8,8 @@ use alloc::collections::linked_list::LinkedList;
 use crate::timer;
 use core::str;
 use alloc::string::ToString;
+use spin::Mutex;
+use lazy_static::lazy_static;
 
 #[repr(u8)]
 pub enum ATACommand {
@@ -143,6 +145,19 @@ const HS2: usize = 4;
 const HS3: usize = 5;
 const WTG: usize = 6;
 
+pub struct AtaHandler {
+    pub detected: bool,
+    pub total_sectors: usize,
+    pub master: bool,
+}
+
+lazy_static! {
+    pub static ref ATA_HANDLER: Mutex<AtaHandler> = Mutex::new(AtaHandler {
+        detected: false,
+        total_sectors: 0,
+        master: true,
+    });
+}
 
 pub fn init() {
     unsafe {
@@ -203,7 +218,7 @@ pub fn identify_drive() {
             let (lobytes, hibytes) = (raw[60].to_le_bytes(), raw[61].to_le_bytes());
             u32::from_le_bytes([lobytes[0], lobytes[1], hibytes[0], hibytes[1]])
         };
-        println!("[ATA] total LBA28 sectors: {}", total_sectors_lba28);
+        ATA_HANDLER.lock().total_sectors = total_sectors_lba28 as usize;
 
 	    let model_number = {
 		    let mut bytes: Vec<u8> = Vec::new();
@@ -221,8 +236,8 @@ pub fn identify_drive() {
     	};
 		println!("[ATA] model: {}", model_number);
 
+        ATA_HANDLER.lock().detected = true;
     }
-    println!();
 }
 
 pub fn pio28_read(master: bool, lba: usize, count: u8) -> [u8; 512] {

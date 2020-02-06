@@ -1,0 +1,38 @@
+wFS
+
+sector size = 512 bytes
+1 block per sector
+
+disk layout:
+info block
+file entries/sectors
+
+attribute bits:
+READ_ONLY--SYSTEM--DIRECTORY--HIDDEN--RESERVED--RESERVED--RESERVED--RESERVED
+
+info block: (block 0 reserved)
+        bytes 0..=7    reserved
+        _WFS_SIG      wfs signature
+        u64           total blocks
+        u64           total blocks in use
+        u64           total files
+        u64           bytes per block
+
+file entry: (128 bytes)
+        u64           parent id
+        [char; 77]   filename
+        u64           id
+        u8            attributes
+        u64           time of creation
+        u64           time of edit
+        u16           owner
+        u64           size in bytes
+        u64           sector location of first block
+
+data sector: (512 bytes)
+        DATA          file data signature
+        u64           next sector location
+        [u8; 500]     file data
+
+
+
