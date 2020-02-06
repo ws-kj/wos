@@ -10,7 +10,9 @@ Progress:
 - [x] RTC support
 - [x] Basic VFS
 - [x] InitRD
-- [ ] HDD driver
+- [x] ATA PIO driver
+- [ ] PCI
+- [ ] AHCI driver
 - [ ] Filesystem driver
 - [ ] ELF executables
 - [ ] Multitasking
