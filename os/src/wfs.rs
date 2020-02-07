@@ -8,6 +8,10 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::convert::TryInto;
 
+const FREE: u64 = 0x00000000_00000000;
+const RESERVED: u64 = 0xFFFFFFFF_FFFFFFF0;
+const END_OF_CHAIN: u64 = 0xFFFFFFFF_FFFFFFFF;
+
 #[repr(C)]
 pub struct InfoBlock {
     reserved: u8,
@@ -115,4 +119,59 @@ pub fn init_fs() {
     WFS_INFO.lock().blocks_in_use = u64::from_le_bytes(info_block[17..=24].try_into().expect(""));
     WFS_INFO.lock().files = u64::from_le_bytes(info_block[25..=32].try_into().expect(""));
     WFS_INFO.lock().bytes_per_block = u64::from_le_bytes(info_block[33..=40].try_into().expect(""));
+}
+
+pub fn read_file(file: FileEntry) -> Option<Vec<u8>> {
+    let mut sec_count = 0;
+
+    if file.size % 500 == 0 {
+        sec_count = file.size / 500;
+    } else {
+        sec_count = (file.size - (file.size % 500)) + 1;
+    }
+  
+    let mut ret: Vec<u8> = Vec::new();
+    let mut lba = file.start_sec as usize;
+
+    let mut written: usize = 0;
+    for i in 0..sec_count {
+        let raw = ata::pio28_read(ata::ATA_HANDLER.lock().master, lba, 1);
+
+        if String::from_utf8_lossy(&raw[0..=3]) != String::from("DATA") {
+            return None;
+        } 
+
+        let next = u64::from_le_bytes(raw[4..=11].try_into().expect(""));
+
+        if next == FREE || next == RESERVED {
+            return None;
+        }
+        
+        if next == END_OF_CHAIN {
+            break;
+        }
+
+        for b in &raw[13..=512] {
+            if written >= file.size as usize - 1 {
+                break;
+            }
+            ret.push(*b);
+            written += 1;
+        }    
+
+        lba = next as usize;
+    }
+
+    return Some(ret);
+}
+
+pub fn get_empty_block() -> usize {
+    for i in 1..WFS_INFO.lock().blocks as usize {
+        let raw = ata::pio28_read(ata::ATA_HANDLER.lock().master, i, 1);
+        if String::from_utf8_lossy(&raw[0..=3]) != String::from("DATA") {
+            return i;
+        }    
+    }
+    panic!("[WFS] No free block found.");
+    return 0;
 }

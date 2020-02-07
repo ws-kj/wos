@@ -10,6 +10,11 @@ file entries/sectors
 attribute bits:
 READ_ONLY--SYSTEM--DIRECTORY--HIDDEN--RESERVED--RESERVED--RESERVED--RESERVED
 
+next_sector values:
+free: 0x00000000_00000000
+reserved: 0xFFFFFFFF_FFFFFFF0
+end of chain:  0xFFFFFFFF_FFFFFFFF
+
 info block: (block 0 reserved)
         bytes 0..=7    reserved
         _WFS_SIG      wfs signature
