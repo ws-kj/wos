@@ -2,6 +2,7 @@
 //Spec can be found at ../wfs_spec.txt
 
 use crate::vfs;
+use crate::timer;
 use crate::drivers::ata;
 use spin::Mutex;
 use lazy_static::lazy_static;
@@ -45,6 +46,7 @@ pub struct FileEntry {
     size: u64,
     start_sec: u64,
     next_entry: u64,
+    prev_entry: u64,
     location: u64,
 }
 impl Default for FileEntry {
@@ -61,6 +63,7 @@ impl Default for FileEntry {
             size: 0,
             start_sec: 0,
             next_entry: 0,
+            prev_entry: 0,
             location: 0,
         }
     }
@@ -130,12 +133,12 @@ pub fn install_ata() {
         size: 0,
         start_sec: END_OF_CHAIN,
         next_entry: END_OF_CHAIN,
+        prev_entry: END_OF_CHAIN,
         location: 1,
     };
     let root_arr = sector_from_entry(root);
     println!("[WFS] Writing Root file entry to ATA drive.");
     ata::pio28_write(ata::ATA_HANDLER.lock().master, 1, 1, root_arr);
-
     init_fs();
 }
 
@@ -149,22 +152,7 @@ pub fn init_fs() {
     WFS_INFO.lock().files = u64::from_le_bytes(info_block[25..=32].try_into().expect(""));
     WFS_INFO.lock().bytes_per_block = u64::from_le_bytes(info_block[33..=40].try_into().expect(""));
     WFS_INFO.lock().final_entry = u64::from_le_bytes(info_block[41..49].try_into().expect(""));
-
-    let home = create_entry(String::from("Home"), 0, 0, 0);
-
-    match find_entry_by_name(0, String::from("Home")) {
-        Some(e) => println!("Entry exists."),
-        None => println!("Entry does not exist."),
-    }
-
-    let t = ata::pio28_read(true, 1, 1);
-    let t2 = ata::pio28_read(true, 1, 1);
-    //delete_file(home.id);
-    //match find_entry_by_name(0, String::from("Home")) {
-    //    Some(e) => println!("Entry exists."),
-    //    None => println!("Entry does not exist."),
-    //}
-
+    
 }
 
 pub fn read_file(entry: FileEntry) -> Option<Vec<u8>> {
@@ -214,11 +202,19 @@ pub fn read_file(entry: FileEntry) -> Option<Vec<u8>> {
 pub fn delete_file(id: u64) {
     let mut entry: FileEntry = Default::default(); 
     match find_entry(id) {
-        Some(e) => {},
+        Some(e) => entry = e,
         None => return,
     }
-    entry = find_entry(id).unwrap();
     ata::pio28_write(ata::ATA_HANDLER.lock().master, entry.location as usize, 1, [0; 512]);
+
+    let mut prev = entry_from_sector(ata::pio28_read(ata::ATA_HANDLER.lock().master, entry.prev_entry as usize, 1));
+    prev.next_entry = entry.next_entry;
+    ata::pio28_write(ata::ATA_HANDLER.lock().master, prev.location as usize, 1, sector_from_entry(prev));
+
+    if entry.size == 0 || entry.start_sec == 0 || entry.start_sec == END_OF_CHAIN {
+        return;
+    }
+
     let mut lba = entry.start_sec as usize;
     loop {
         let raw = ata::pio28_read(ata::ATA_HANDLER.lock().master, lba, 1);
@@ -231,7 +227,7 @@ pub fn delete_file(id: u64) {
 
         lba = next as usize;
     }
-    println!("[WFS] file deleted");
+
 } 
 
 pub fn create_entry(filename: String, parent_id: u64, attributes: u8, owner: u8) -> FileEntry {
@@ -241,11 +237,13 @@ pub fn create_entry(filename: String, parent_id: u64, attributes: u8, owner: u8)
 
     let block = find_empty_block();
 
+    let f = WFS_INFO.lock().files;
+
     let entry = FileEntry {
         signature: DATA_SIG,
         filename: filename_from_string(filename),
         parent_id: parent_id,
-        id: WFS_INFO.lock().files,
+        id: f,
         attributes: attributes,
         t_creation: 0,      //TODO: implement global time format fitting in u64
         t_edit: 0,
@@ -253,14 +251,18 @@ pub fn create_entry(filename: String, parent_id: u64, attributes: u8, owner: u8)
         size: 0,
         start_sec: END_OF_CHAIN,
         next_entry: END_OF_CHAIN,
+        prev_entry: WFS_INFO.lock().final_entry,
         location: block as u64,
     };
     let arr = sector_from_entry(entry);
-
+    
     let mut prev = entry_from_sector(ata::pio28_read(ata::ATA_HANDLER.lock().master, WFS_INFO.lock().final_entry as usize, 1));
-    prev.next_entry = block as u64;
+    prev.next_entry = entry.location;
     let prev_arr = sector_from_entry(prev);
     ata::pio28_write(ata::ATA_HANDLER.lock().master, prev.location as usize, 1, prev_arr);
+    
+    WFS_INFO.lock().final_entry = entry.location;
+    update_info();
 
     ata::pio28_write(ata::ATA_HANDLER.lock().master, entry.location as usize, 1, arr); 
 
@@ -279,9 +281,8 @@ fn find_entry(id: u64) -> Option<FileEntry> {
         if temp.next_entry == END_OF_CHAIN  {
             return None;
         }
-        let sec = ata::pio28_read(m, temp.next_entry as usize, 1);
+        temp = entry_from_sector(ata::pio28_read(m, temp.next_entry as usize, 1));
     }
-    
 }
 
 fn find_entry_by_name(parent_id: u64, name: String) -> Option<FileEntry> {
@@ -352,6 +353,9 @@ fn sector_from_entry(f: FileEntry) -> [u8; 512] {
     for b in &f.next_entry.to_le_bytes() {
         v.push(*b);
     }
+    for b in &f.prev_entry.to_le_bytes() {
+        v.push(*b);
+    }
     for b in &f.location.to_le_bytes() {
         v.push(*b); 
     }
@@ -375,7 +379,8 @@ fn entry_from_sector(sec: [u8; 512]) -> FileEntry {
         size: u64::from_le_bytes(sec[166..174].try_into().expect("sz")),
         start_sec: u64::from_le_bytes(sec[174..182].try_into().expect("ss")),
         next_entry: u64::from_le_bytes(sec[182..190].try_into().expect("ne")),
-        location: u64::from_le_bytes(sec[190..198].try_into().expect("l")),
+        prev_entry: u64::from_le_bytes(sec[190..198].try_into().expect("pe")),
+        location: u64::from_le_bytes(sec[198..206].try_into().expect("l")),
     };
     return res;
 }

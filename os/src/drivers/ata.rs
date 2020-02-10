@@ -260,20 +260,21 @@ pub fn pio28_read(master: bool, lba: usize, count: u8) -> [u8; 512] {
         io::outb(LBAH, lba.get_bits(16..24) as u8);
 
         io::outb(COMMAND, ATACommand::ReadSectors as u8);
+
         delay();
         while io::inb(STATUS).get_bit(BSY) { crate::hlt_loop(); }
-        let mut bytes: LinkedList<u8> = LinkedList::new();
+
+        let mut sector: [u8; 512] = [0; 512];
+
+        let mut j = 0;
         for i in 0..256 {
             let rawbytes = io::inw(DATA).to_le_bytes();
-            bytes.push_back(rawbytes[0]);
-            bytes.push_back(rawbytes[1]);
+            sector[j] = rawbytes[0];
+            sector[j + 1] = rawbytes[1];
+
+            j += 2;
         }
-        let mut sector: [u8; 512] = [0; 512];
-        for i in bytes.iter().zip(sector.iter_mut()) {
-            let (byte, sector) = i;
-            *sector = *byte;
-        }
-        drop(bytes);
+
         return sector;
     }
 }

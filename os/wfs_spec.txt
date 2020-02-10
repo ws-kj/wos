@@ -36,8 +36,10 @@ file entry: (256 bytes)
         u64           size in bytes
         u64           sector location of first data block
         u64           next file entry location
+        u64           previous file entry location
         u64           sector location of self
         RESERVED
+
 data sector: (512 bytes)
         DATA          data signature
         u64           next sector location
