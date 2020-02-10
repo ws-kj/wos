@@ -260,12 +260,10 @@ pub fn pio28_read(master: bool, lba: usize, count: u8) -> [u8; 512] {
         io::outb(LBAH, lba.get_bits(16..24) as u8);
 
         io::outb(COMMAND, ATACommand::ReadSectors as u8);
-        
-        timer::wait(1);
+        delay();
         while io::inb(STATUS).get_bit(BSY) { crate::hlt_loop(); }
-
         let mut bytes: LinkedList<u8> = LinkedList::new();
-        for _ in 0..256 {
+        for i in 0..256 {
             let rawbytes = io::inw(DATA).to_le_bytes();
             bytes.push_back(rawbytes[0]);
             bytes.push_back(rawbytes[1]);
@@ -307,7 +305,7 @@ pub fn pio28_write(master: bool, lba: usize, count: u8, sec: [u8; 512]) {
         io::outb(LBAM, lba.get_bits(8..16) as u8);
         io::outb(LBAH, lba.get_bits(16..24) as u8);
         
-        timer::wait(1);
+        delay();
         while io::inb(STATUS).get_bit(BSY) { crate::hlt_loop(); }
 
         io::outb(COMMAND, ATACommand::WriteSectors as u8);
@@ -325,4 +323,5 @@ fn delay() {
         io::inb(STATUS);
         io::inb(STATUS);
     }
+    timer::wait(1);
 }

@@ -16,7 +16,6 @@
 #![allow(unused_assignments)]
 #![feature(const_str_as_bytes)]
 
-
 extern crate alloc;
 
 use core::panic::PanicInfo;

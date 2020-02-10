@@ -23,7 +23,7 @@ info block: (block 0 reserved)
         u64           total blocks in use
         u64           total files
         u64           bytes per block
-
+        u64           final entry
 file entry: (256 bytes)
         DATA          data signature
         [char; 128]   filename
@@ -34,8 +34,9 @@ file entry: (256 bytes)
         u64           time of edit
         u8            owner
         u64           size in bytes
-        u64           sector location of first block
+        u64           sector location of first data block
         u64           next file entry location
+        u64           sector location of self
         RESERVED
 data sector: (512 bytes)
         DATA          data signature
