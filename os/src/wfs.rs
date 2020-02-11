@@ -13,6 +13,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::convert::TryInto;
 use core::mem;
+use core::convert::AsMut;
 
 const FREE: u64 = 0x00000000_00000000;
 const RESERVED: u64 = 0xFFFFFFFF_FFFFFFF0;
@@ -269,6 +270,74 @@ pub fn create_entry(filename: String, parent_id: u64, attributes: u8, owner: u8)
     return entry;
 }
 
+pub fn write_file(id: u64, buf: Vec<u8>) {
+    let mut entry: FileEntry = Default::default();
+    match find_entry(id) {
+        Some(e) => entry = e,
+        None => return,
+    }
+
+    let mut sec_count = 0;
+
+    if buf.len() % 500 == 0 {
+        sec_count = buf.len() / 500;
+    } else {
+        sec_count = (buf.len() - (buf.len() % 500)) + 1;
+    }
+
+    let mut data: Vec<[u8; 500]> = Vec::with_capacity(sec_count);
+
+    let mut j = 0;
+    for i in 0..sec_count {
+        let mut sec: [u8; 500] = [0; 500];
+
+        if j + 500 > buf.len() {
+            for l in j..buf.len() {
+                sec[l] = buf[l];
+            }    
+        } else {
+            for l in j..j + 500 {
+                sec[l] = buf[l];
+            }
+        }
+
+        data.push(sec);
+        j += 500;
+    }
+
+    let fblock = find_empty_block();
+    entry.start_sec = fblock as u64;
+    ata::pio28_write(ata::ATA_HANDLER.lock().master, entry.location as usize, 1, sector_from_entry(entry));
+
+    let mut block = fblock; 
+    for i in 0..data.len() {
+        let mut sec = [0u8; 512];
+        
+        for j in 0..4 {
+            sec[j] = DATA_SIG[j];
+        }
+        
+        for j in 12..512 {
+            sec[j] = data[i][j - 12];
+        }
+
+        ata::pio28_write(ata::ATA_HANDLER.lock().master, block, 1, sec);
+
+        let next = find_empty_block();
+
+        let mut j = 4;
+        for b in &next.to_le_bytes() {
+            sec[j] = *b;
+            j += 1;
+        }
+
+        ata::pio28_write(ata::ATA_HANDLER.lock().master, block, 1, sec);
+
+        block = next;
+    }
+
+}
+
 fn find_entry(id: u64) -> Option<FileEntry> {
     let m = ata::ATA_HANDLER.lock().master;
 
@@ -453,3 +522,4 @@ unsafe fn as_u8_slice<T: Sized>(p: &T) -> &[u8] {
         mem::size_of::<T>(),
     )
 }
+
