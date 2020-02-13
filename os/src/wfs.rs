@@ -15,6 +15,7 @@ use alloc::vec;
 use core::convert::TryInto;
 use core::mem;
 use core::convert::AsMut;
+use core::result::Result;
 
 const FREE: u64 = 0x00000000_00000000;
 const RESERVED: u64 = 0xFFFFFFFF_FFFFFFF0;
@@ -154,34 +155,6 @@ pub fn init_fs() {
     WFS_INFO.lock().files = u64::from_le_bytes(info_block[25..=32].try_into().expect(""));
     WFS_INFO.lock().bytes_per_block = u64::from_le_bytes(info_block[33..=40].try_into().expect(""));
     WFS_INFO.lock().final_entry = u64::from_le_bytes(info_block[41..49].try_into().expect(""));
-
-    let mut home = create_entry(String::from("test"), 0, 0, 0);
-
-    let mut testbuf: Vec<u8> = Vec::new();
-    testbuf.push(b'h');
-    testbuf.push(b'e');
-    testbuf.push(b'l');
-    testbuf.push(b'l');
-    testbuf.push(b'o');
-
-    write_file(home.id, testbuf);
-
-    let mut inbuf: Vec<u8> = Vec::new();
-    match read_file(1) {
-        Some(b) => inbuf = b,
-        None => return,
-    }
-    for b in inbuf.iter() {
-        print!("{}", *b as char);
-    }
-
-    append_file(home.id, vec![b'!']);
-    println!();
-
-    for b in read_file(1).unwrap().iter() {
-        print!("{}", *b as char);
-    }
-    
 }
 
 pub fn read_file(id: u64) -> Option<Vec<u8>> {
@@ -234,11 +207,11 @@ pub fn read_file(id: u64) -> Option<Vec<u8>> {
     return Some(ret);
 }
 
-pub fn delete_file(id: u64) {
+pub fn delete_file(id: u64) -> Result<(), &'static str>{
     let mut entry: FileEntry = Default::default(); 
     match find_entry(id) {
         Some(e) => entry = e,
-        None => return,
+        None => return Err("file not found"),
     }
     ata::pio28_write(ata::ATA_HANDLER.lock().master, entry.location as usize, 1, [0; 512]);
 
@@ -246,8 +219,12 @@ pub fn delete_file(id: u64) {
     prev.next_entry = entry.next_entry;
     ata::pio28_write(ata::ATA_HANDLER.lock().master, prev.location as usize, 1, sector_from_entry(prev));
 
+    if entry.attributes.get_bit(0) || entry.attributes.get_bit(2) {
+        return Err("operation not permitted");
+    }
+
     if entry.size == 0 || entry.start_sec == 0 || entry.start_sec == END_OF_CHAIN {
-        return;
+        return Ok(());
     }
 
     let mut lba = entry.start_sec as usize;
@@ -262,6 +239,7 @@ pub fn delete_file(id: u64) {
 
         lba = next as usize;
     }
+    Ok(())
 } 
 
 pub fn create_entry(filename: String, parent_id: u64, attributes: u8, owner: u8) -> FileEntry {
@@ -303,15 +281,15 @@ pub fn create_entry(filename: String, parent_id: u64, attributes: u8, owner: u8)
     return entry;
 }
 
-pub fn write_file(id: u64, buf: Vec<u8>) {
+pub fn write_file(id: u64, buf: Vec<u8>) -> Result<(), &'static str> {
     let mut entry: FileEntry = Default::default();
     match find_entry(id) {
         Some(e) => entry = e,
-        None => return,
+        None => return Err("file not found"),
     }
 
     if entry.attributes.get_bit(0) || entry.attributes.get_bit(2) {
-        return;
+        return Err("operation not permitted");
     }
 
     if entry.size > 0 {
@@ -399,19 +377,21 @@ pub fn write_file(id: u64, buf: Vec<u8>) {
 
         block = next;
     }
+
+    Ok(())
 }
 
-pub fn append_file(id: u64, b: Vec<u8>) {
+pub fn append_file(id: u64, b: Vec<u8>) -> Result<(), &'static str> {
     let mut buf = b;
 
     let mut entry: FileEntry = Default::default();
     match find_entry(id) {
         Some(e) => entry = e,
-        None => return,
+        None => return Err("file not found"),
     }
 
     if entry.attributes.get_bit(0) || entry.attributes.get_bit(2) {
-        return;
+        return Err("operation not permitted");
     }
 
     let mut nsec_count = 0;
@@ -452,7 +432,7 @@ pub fn append_file(id: u64, b: Vec<u8>) {
     }
 
     if buf.len() == 0 {
-        return;
+        return Ok(());
     }
 
     if buf.len() % 500 == 0 {
@@ -536,7 +516,7 @@ pub fn append_file(id: u64, b: Vec<u8>) {
 
         block = next;
     }
-
+    Ok(())
 }
 
 fn find_entry(id: u64) -> Option<FileEntry> {
