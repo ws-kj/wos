@@ -11,6 +11,7 @@ use crate::println;
 use crate::print;
 use alloc::string::String;
 use alloc::vec::Vec;
+use alloc::vec;
 use core::convert::TryInto;
 use core::mem;
 use core::convert::AsMut;
@@ -153,10 +154,43 @@ pub fn init_fs() {
     WFS_INFO.lock().files = u64::from_le_bytes(info_block[25..=32].try_into().expect(""));
     WFS_INFO.lock().bytes_per_block = u64::from_le_bytes(info_block[33..=40].try_into().expect(""));
     WFS_INFO.lock().final_entry = u64::from_le_bytes(info_block[41..49].try_into().expect(""));
+
+    let mut home = create_entry(String::from("test"), 0, 0, 0);
+
+    let mut testbuf: Vec<u8> = Vec::new();
+    testbuf.push(b'h');
+    testbuf.push(b'e');
+    testbuf.push(b'l');
+    testbuf.push(b'l');
+    testbuf.push(b'o');
+
+    write_file(home.id, testbuf);
+
+    let mut inbuf: Vec<u8> = Vec::new();
+    match read_file(1) {
+        Some(b) => inbuf = b,
+        None => return,
+    }
+    for b in inbuf.iter() {
+        print!("{}", *b as char);
+    }
+
+    append_file(home.id, vec![b'!']);
+    println!();
+
+    for b in read_file(1).unwrap().iter() {
+        print!("{}", *b as char);
+    }
     
 }
 
-pub fn read_file(entry: FileEntry) -> Option<Vec<u8>> {
+pub fn read_file(id: u64) -> Option<Vec<u8>> {
+    let mut entry: FileEntry = Default::default(); 
+    match find_entry(id) {
+        Some(e) => entry = e,
+        None => return None,
+    }
+
     let mut sec_count = 0;
 
     if entry.size % 500 == 0 {
@@ -164,7 +198,7 @@ pub fn read_file(entry: FileEntry) -> Option<Vec<u8>> {
     } else {
         sec_count = (entry.size - (entry.size % 500)) + 1;
     }
-  
+
     let mut ret: Vec<u8> = Vec::new();
     let mut lba = entry.start_sec as usize;
 
@@ -182,17 +216,17 @@ pub fn read_file(entry: FileEntry) -> Option<Vec<u8>> {
             return None;
         }
         
-        if next == END_OF_CHAIN {
-            break;
-        }
-
-        for b in &raw[13..=512] {
-            if written >= entry.size as usize - 1 {
+        for b in &raw[12..512] {
+            if written >= entry.size as usize {
                 break;
             }
             ret.push(*b);
             written += 1;
         }    
+
+        if next == END_OF_CHAIN {
+            break;
+        }
 
         lba = next as usize;
     }
@@ -228,7 +262,6 @@ pub fn delete_file(id: u64) {
 
         lba = next as usize;
     }
-
 } 
 
 pub fn create_entry(filename: String, parent_id: u64, attributes: u8, owner: u8) -> FileEntry {
@@ -277,6 +310,25 @@ pub fn write_file(id: u64, buf: Vec<u8>) {
         None => return,
     }
 
+    if entry.attributes.get_bit(0) || entry.attributes.get_bit(2) {
+        return;
+    }
+
+    if entry.size > 0 {
+        let mut lba = entry.start_sec as usize;
+        loop {
+            let raw = ata::pio28_read(ata::ATA_HANDLER.lock().master, lba, 1);
+            let next = u64::from_le_bytes(raw[4..12].try_into().expect(""));
+            if next == END_OF_CHAIN {
+                break;
+            }
+            //TODO: Not make this fucking stupid
+            ata::pio28_write(ata::ATA_HANDLER.lock().master, next as usize, 1, [0; 512]); 
+
+            lba = next as usize;
+        }
+    }
+
     let mut sec_count = 0;
 
     if buf.len() % 500 == 0 {
@@ -284,7 +336,6 @@ pub fn write_file(id: u64, buf: Vec<u8>) {
     } else {
         sec_count = (buf.len() - (buf.len() % 500)) + 1;
     }
-
     let mut data: Vec<[u8; 500]> = Vec::with_capacity(sec_count);
 
     let mut j = 0;
@@ -306,7 +357,9 @@ pub fn write_file(id: u64, buf: Vec<u8>) {
     }
 
     let fblock = find_empty_block();
+
     entry.start_sec = fblock as u64;
+    entry.size = buf.len() as u64;
     ata::pio28_write(ata::ATA_HANDLER.lock().master, entry.location as usize, 1, sector_from_entry(entry));
 
     let mut block = fblock; 
@@ -322,15 +375,163 @@ pub fn write_file(id: u64, buf: Vec<u8>) {
         }
 
         ata::pio28_write(ata::ATA_HANDLER.lock().master, block, 1, sec);
+        WFS_INFO.lock().blocks_in_use += 1;
 
         let next = find_empty_block();
 
         let mut j = 4;
-        for b in &next.to_le_bytes() {
-            sec[j] = *b;
+        if i == data.len() - 1 {
+            for b in &END_OF_CHAIN.to_le_bytes() {
+                sec[j] = *b;
+                j += 1;
+            }
+        } else {
+            for b in &next.to_le_bytes() {
+                sec[j] = *b;
+                j += 1;
+            }
+        }
+        ata::pio28_write(ata::ATA_HANDLER.lock().master, block, 1, sec);
+
+        let buffer = ata::pio28_read(true, block, 1);
+        let sig: [u8; 4] = buffer[0..4].try_into().expect("");
+        let bn = u64::from_le_bytes(buffer[4..12].try_into().expect(""));
+
+        block = next;
+    }
+}
+
+pub fn append_file(id: u64, b: Vec<u8>) {
+    let mut buf = b;
+
+    let mut entry: FileEntry = Default::default();
+    match find_entry(id) {
+        Some(e) => entry = e,
+        None => return,
+    }
+
+    if entry.attributes.get_bit(0) || entry.attributes.get_bit(2) {
+        return;
+    }
+
+    let mut nsec_count = 0;
+    let mut offset = buf.len() % 500;
+    if offset != 0 {
+        let mut full: [u8; 500] = [0; 500];
+        let mut sec: [u8; 512] = [0; 512];
+
+        let mut next = entry.start_sec;
+        loop {
+            let raw = ata::pio28_read(ata::ATA_HANDLER.lock().master, next as usize, 1);
+            let n = u64::from_le_bytes(raw[4..12].try_into().expect(""));
+
+            if n == END_OF_CHAIN {
+                sec = raw;
+                break;
+            }
+
+            next = n;
+        }
+
+        let secoff = offset + 11 + entry.size as usize;
+        let mut j = 0;
+        for i in secoff..secoff + buf.len() {
+            sec[i] = buf[j];
+            entry.size += 1;
+            buf.remove(j);
+            if i >= 512 {
+                break;
+            }
+
             j += 1;
         }
 
+        ata::pio28_write(ata::ATA_HANDLER.lock().master, next as usize, 1, sec);
+
+        ata::pio28_write(ata::ATA_HANDLER.lock().master, entry.location as usize, 1, sector_from_entry(entry));
+    }
+
+    if buf.len() == 0 {
+        return;
+    }
+
+    if buf.len() % 500 == 0 {
+        nsec_count = buf.len() / 500;
+    } else {
+        nsec_count = (buf.len() - (buf.len() % 500)) + 1;
+        offset = buf.len() % 500;
+    }
+    let mut ndata: Vec<[u8; 500]> = Vec::with_capacity(nsec_count);
+
+
+    let mut j = 0;
+    for i in 0..nsec_count {
+        let mut sec: [u8; 500] = [0; 500];
+
+        if j + 500 > buf.len() {
+            for l in j..buf.len() {
+                sec[l] = buf[l];
+            }
+        } else {
+            for l in j..j + 500 {
+                sec[l] = buf[l];
+            }
+        }
+
+        ndata.push(sec);
+        j += 500;
+    }
+
+    let mut fblock = find_empty_block();
+    let mut block = fblock;
+    if entry.size == 0 {
+        entry.start_sec = fblock as u64;
+    } else {
+        let mut next = entry.start_sec;
+        loop {
+            let raw = ata::pio28_read(ata::ATA_HANDLER.lock().master, next as usize, 1);
+            let n = u64::from_le_bytes(raw[4..12].try_into().expect(""));
+            if n == END_OF_CHAIN {
+                block = next as usize;
+                break;
+            } 
+
+            next = n;
+        }
+    }
+
+    entry.size = entry.size + buf.len() as u64;
+    ata::pio28_write(ata::ATA_HANDLER.lock().master, entry.location as usize, 1, sector_from_entry(entry));
+
+    for i in 0..ndata.len() {
+        let mut sec = [0u8; 512];
+
+        for j in 0..4 {
+            sec[j] = DATA_SIG[j];
+        }
+
+        for j in 12..512 {
+            sec[j] = ndata[i][j - 12];
+        }
+
+        ata::pio28_write(ata::ATA_HANDLER.lock().master, block, 1, sec);
+        WFS_INFO.lock().blocks_in_use += 1;
+        update_info();
+
+        let next = find_empty_block();
+
+        let mut j = 4;
+        if i == ndata.len() - 1 {
+            for b in &END_OF_CHAIN.to_le_bytes() {
+                sec[j] = *b;
+                j += 1;
+            }
+        } else {
+            for b in &next.to_le_bytes() {
+                sec[j] = *b;
+                j += 1;
+            }
+        }
         ata::pio28_write(ata::ATA_HANDLER.lock().master, block, 1, sec);
 
         block = next;

@@ -234,7 +234,7 @@ pub fn identify_drive() {
 		    }
 		    String::from_utf8(bytes).unwrap()
     	};
-		println!("[ATA] model: {}", model_number);
+		println!("[ATA] Model: {}", model_number);
 
         ATA_HANDLER.lock().detected = true;
     }
