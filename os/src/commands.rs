@@ -6,12 +6,7 @@ use lazy_static::lazy_static;
 use alloc::string::String;
 use crate::vga_buffer;
 use crate::println;
-use crate::print;
 use crate::drivers::cmos;
-use crate::vfs;
-use core::str;
-use crate::console;
-use core::ptr;
 
 pub struct Command {
     com_name: String,
@@ -52,7 +47,7 @@ pub fn init() {
         func: time_fn,
     };
     init_command(String::from("time"), time);
-
+/*
     let ls = Command {
         com_name: String::from("ls"),
         desc: String::from("list files"),
@@ -93,7 +88,7 @@ pub fn init() {
         desc: String::from("move file"),
         func: mv_fn,
     };
-    init_command(String::from("mv"), mv);
+    init_command(String::from("mv"), mv);*/
 }
 
 pub fn init_command(n: String, c: Command) {
@@ -138,7 +133,7 @@ pub fn help_fn(args: Vec<String>) {
 pub fn time_fn(args: Vec<String>) {
     println!("{}", cmos::RTC.lock().get_datetime());
 }
-
+/*
 pub fn ls_fn(args: Vec<String>) {
 
     let mut node = console::get_wd();
@@ -247,6 +242,6 @@ pub fn mv_fn(args: Vec<String>) { unsafe {
 
     vfs::reparent(f, d);
 }}
-
+*/
 
 

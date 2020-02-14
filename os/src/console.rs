@@ -1,15 +1,6 @@
 extern crate alloc;
 
-use crate::vfs;
-use alloc::string::{ToString, String};
-use crate::stdin;
-use lazy_static::lazy_static;
-use spin::Mutex;
-use crate::print;
-use alloc::vec::Vec;
-use crate::commands;
-use crate::vga_buffer;
-
+/*
 pub struct Console {
     wd: *mut vfs::FsNode,
 }
@@ -20,6 +11,7 @@ lazy_static! {
         wd: &mut vfs::FS_ROOT.lock().node,   
     });
 }
+
 
 pub fn prompt() {
     unsafe {
@@ -56,4 +48,4 @@ pub fn get_wd() -> *mut vfs::FsNode {
 pub fn set_wd(node: &mut vfs::FsNode) {
     CONSOLE.lock().wd = node;
 }
-
+*/

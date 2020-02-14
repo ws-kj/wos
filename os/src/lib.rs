@@ -31,7 +31,6 @@ pub mod stdin;
 pub mod console;
 pub mod commands;
 pub mod vfs;
-pub mod initrd;
 pub mod timer;
 pub mod pic;
 pub mod drivers;

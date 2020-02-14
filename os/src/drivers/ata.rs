@@ -1,13 +1,8 @@
 use crate::io;
 use crate::println;
-use crate::print;
 use bit_field::BitField;
 use alloc::vec::Vec;
 use alloc::string::String;
-use alloc::collections::linked_list::LinkedList;
-use crate::timer;
-use core::str;
-use alloc::string::ToString;
 use spin::Mutex;
 use lazy_static::lazy_static;
 
@@ -324,8 +319,8 @@ pub fn pio28_write(master: bool, lba: usize, count: u8, sec: [u8; 512]) {
     }
 }
 
+#[no_mangle]
 fn delay() {
-
     for _ in 0..80 {}
 
     unsafe {

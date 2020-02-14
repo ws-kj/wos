@@ -9,12 +9,10 @@ extern crate alloc;
 
 use core::panic::PanicInfo;
 use os::println;
-use os::console;
 use bootloader::{entry_point, BootInfo};
 use os::vga_buffer;
 use os::commands;
 use os::drivers::cmos;
-use os::initrd;
 use os::drivers::ata;
 use os::wfs;
 
@@ -40,14 +38,14 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     vga_buffer::WRITER.lock().clear_screen();
 
     commands::init();
-    initrd::init();
     ata::init();
     wfs::init();
 
     println!("");
     println!("wOS v0.1.0    {}", cmos::RTC.lock().get_datetime());
     println!("kernel debug console - enter 'help' for a list of commands\n");
-    console::prompt();
+    println!("KDC CURRENTLY OFFLINE DUE TO VFS REDESIGN");
+    //console::prompt();
     os::hlt_loop();
 }
 

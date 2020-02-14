@@ -2,20 +2,17 @@
 //Spec can be found at ../wfs_spec.txt
 
 use crate::vfs;
-use crate::timer;
 use crate::drivers::ata;
 use spin::Mutex;
 use lazy_static::lazy_static;
 use bit_field::BitField;
 use crate::println;
-use crate::print;
 use alloc::string::String;
 use alloc::vec::Vec;
-use alloc::vec;
 use core::convert::TryInto;
 use core::mem;
-use core::convert::AsMut;
 use core::result::Result;
+use alloc::string::ToString;
 
 const FREE: u64 = 0x00000000_00000000;
 const RESERVED: u64 = 0xFFFFFFFF_FFFFFFF0;
@@ -122,7 +119,7 @@ pub fn install_ata() {
     println!("[WFS] Writing InfoBlock to ATA drive.");
     update_info();
 
-    let mut root_arr: [u8; 512] = [0; 512];
+    let root_arr: [u8; 512] = [0; 512];
     let root_attributes: u8 = *0.set_bit(0, true).set_bit(1, true).set_bit(2, true);
     let root = FileEntry {
         filename: filename_from_string(String::from("ATA0")),
@@ -155,6 +152,36 @@ pub fn init_fs() {
     WFS_INFO.lock().files = u64::from_le_bytes(info_block[25..=32].try_into().expect(""));
     WFS_INFO.lock().bytes_per_block = u64::from_le_bytes(info_block[33..=40].try_into().expect(""));
     WFS_INFO.lock().final_entry = u64::from_le_bytes(info_block[41..49].try_into().expect(""));
+
+    vfs::install_device(String::from("ATA0"), vfs::System::WFS);
+}
+
+pub fn find_node(parent_id: u64, name: &'static str, did: usize) -> Result<vfs::FsNode, &'static str> {
+    match find_entry_by_name(parent_id, name.to_string()) {
+        Some(e) => {
+
+            let mut dev_id = 0;
+            match vfs::DEVICES.lock().get(did) {
+                Some(d) => dev_id = did,
+                None => return Err("invalid device id"),
+            }
+
+            let entry = e;
+            let node = vfs::FsNode {
+                name: vfs::nfs(name.to_string()), 
+                device: dev_id,
+                parent_id: parent_id,
+                id: entry.id,
+                attributes: entry.attributes,
+                t_creation: entry.t_creation,
+                t_edit: entry.t_edit,
+                owner: entry.owner,
+                size: entry.size,
+            };
+            return Ok(node);
+        },
+        None => return Err("file not found"),
+    }
 }
 
 pub fn read_file(id: u64) -> Option<Vec<u8>> {
@@ -207,7 +234,7 @@ pub fn read_file(id: u64) -> Option<Vec<u8>> {
     return Some(ret);
 }
 
-pub fn delete_file(id: u64) -> Result<(), &'static str>{
+pub fn delete_file(id: u64) -> Result<(), &'static str> {
     let mut entry: FileEntry = Default::default(); 
     match find_entry(id) {
         Some(e) => entry = e,
@@ -397,7 +424,7 @@ pub fn append_file(id: u64, b: Vec<u8>) -> Result<(), &'static str> {
     let mut nsec_count = 0;
     let mut offset = buf.len() % 500;
     if offset != 0 {
-        let mut full: [u8; 500] = [0; 500];
+        let full: [u8; 500] = [0; 500];
         let mut sec: [u8; 512] = [0; 512];
 
         let mut next = entry.start_sec;
@@ -462,7 +489,7 @@ pub fn append_file(id: u64, b: Vec<u8>) -> Result<(), &'static str> {
         j += 500;
     }
 
-    let mut fblock = find_empty_block();
+    let fblock = find_empty_block();
     let mut block = fblock;
     if entry.size == 0 {
         entry.start_sec = fblock as u64;
