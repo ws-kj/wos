@@ -11,9 +11,9 @@ Progress:
 - [x] Basic VFS
 - [x] InitRD
 - [x] ATA PIO driver
+- [x] Filesystem driver (wFS)
 - [ ] PCI
 - [ ] AHCI driver
-- [ ] Filesystem driver
 - [ ] ELF executables
 - [ ] Multitasking
 - [ ] Usermode
