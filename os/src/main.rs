@@ -7,6 +7,7 @@
 
 extern crate alloc;
 
+use bit_field::BitField;
 use core::panic::PanicInfo;
 use os::println;
 use bootloader::{entry_point, BootInfo};
@@ -15,6 +16,10 @@ use os::commands;
 use os::drivers::cmos;
 use os::drivers::ata;
 use os::wfs;
+use os::vfs;
+use alloc::vec::Vec;
+use alloc::string::String;
+use os::print;
 
 entry_point!(kernel_main);
 
@@ -43,8 +48,21 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
     println!("");
     println!("wOS v0.1.0    {}", cmos::RTC.lock().get_datetime());
-    println!("kernel debug console - enter 'help' for a list of commands\n");
-    println!("KDC CURRENTLY OFFLINE DUE TO VFS REDESIGN");
+
+    let mut n = vfs::create_node(0, "Home", 0, 0, 0).unwrap();
+    
+    let mut buf: Vec<u8> = String::from("Hello World!").into_bytes();
+    n.write(buf).unwrap();
+    
+    println!("Reading file '{}'", vfs::sfn(n.name));
+
+    let inbuf = n.read().unwrap();
+    for b in inbuf {
+        print!("{}", b as char);
+    }
+    println!();
+
+    //println!("kernel debug console - enter 'help' for a list of commands\n");
     //console::prompt();
     os::hlt_loop();
 }

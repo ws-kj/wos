@@ -122,7 +122,7 @@ pub fn install_ata() {
     let root_arr: [u8; 512] = [0; 512];
     let root_attributes: u8 = *0.set_bit(0, true).set_bit(1, true).set_bit(2, true);
     let root = FileEntry {
-        filename: filename_from_string(String::from("ATA0")),
+        filename: filename_from_string(String::from("/")),
         signature: DATA_SIG,
         parent_id: 0,
         id: 0,
@@ -156,16 +156,11 @@ pub fn init_fs() {
     vfs::install_device(String::from("ATA0"), vfs::System::WFS);
 }
 
-pub fn find_node(parent_id: u64, name: &'static str, did: usize) -> Result<vfs::FsNode, &'static str> {
+// VFS functions
+
+pub fn find_node(parent_id: u64, name: &'static str, dev_id: usize) -> Result<vfs::FsNode, &'static str> {
     match find_entry_by_name(parent_id, name.to_string()) {
         Some(e) => {
-
-            let mut dev_id = 0;
-            match vfs::DEVICES.lock().get(did) {
-                Some(d) => dev_id = did,
-                None => return Err("invalid device id"),
-            }
-
             let entry = e;
             let node = vfs::FsNode {
                 name: vfs::nfs(name.to_string()), 
@@ -184,13 +179,46 @@ pub fn find_node(parent_id: u64, name: &'static str, did: usize) -> Result<vfs::
     }
 }
 
-pub fn read_file(id: u64) -> Option<Vec<u8>> {
-    let mut entry: FileEntry = Default::default(); 
-    match find_entry(id) {
-        Some(e) => entry = e,
-        None => return None,
+pub fn create_node(parent_id: u64, filename: &'static str, attributes: u8, owner: u8, dev_id: usize) -> Result<vfs::FsNode, &'static str> {
+    match find_entry(parent_id) {
+        Some(p) => {},
+        None => return Err("parent node not found"),
     }
 
+    let entry = create_entry(filename.to_string(), parent_id, attributes, owner);
+    let node = vfs::FsNode {
+        name: vfs::nfs(filename.to_string()),
+        device: dev_id,
+        parent_id: parent_id,
+        id: entry.id,
+        attributes: entry.attributes,
+        t_creation: entry.t_creation,
+        t_edit: entry.t_edit,
+        owner: entry.owner,
+        size: entry.size,
+    };
+    return Ok(node);
+}
+
+pub fn read_node(parent_id: u64, filename: String) -> Result<Vec<u8>, &'static str> {
+    match find_entry_by_name(parent_id, filename) {
+        Some(e) => {
+            return read_entry(e);
+        },
+        None => return Err("file not found"),
+    }
+}
+
+pub fn write_node(parent_id: u64, filename: String, buf: Vec<u8>) -> Result<(), &'static str> {
+    match find_entry_by_name(parent_id, filename) {
+        Some(e) => return write_entry(e, buf),
+        None => return Err("file not found"),
+    }
+}
+
+//WFS specific functions
+
+fn read_entry(entry: FileEntry) -> Result<Vec<u8>, &'static str> {
     let mut sec_count = 0;
 
     if entry.size % 500 == 0 {
@@ -207,13 +235,13 @@ pub fn read_file(id: u64) -> Option<Vec<u8>> {
         let raw = ata::pio28_read(ata::ATA_HANDLER.lock().master, lba, 1);
 
         if raw[0..4] != DATA_SIG {
-            return None;
+            return Err("corrupted data block");
         } 
 
         let next = u64::from_le_bytes(raw[4..12].try_into().expect(""));
 
         if next == FREE || next == RESERVED {
-            return None;
+            return Err("illegal data block access");
         }
         
         for b in &raw[12..512] {
@@ -231,10 +259,10 @@ pub fn read_file(id: u64) -> Option<Vec<u8>> {
         lba = next as usize;
     }
 
-    return Some(ret);
+    return Ok(ret);
 }
 
-pub fn delete_file(id: u64) -> Result<(), &'static str> {
+fn delete_file(id: u64) -> Result<(), &'static str> {
     let mut entry: FileEntry = Default::default(); 
     match find_entry(id) {
         Some(e) => entry = e,
@@ -269,7 +297,7 @@ pub fn delete_file(id: u64) -> Result<(), &'static str> {
     Ok(())
 } 
 
-pub fn create_entry(filename: String, parent_id: u64, attributes: u8, owner: u8) -> FileEntry {
+fn create_entry(filename: String, parent_id: u64, attributes: u8, owner: u8) -> FileEntry {
     WFS_INFO.lock().files += 1;
     WFS_INFO.lock().blocks_in_use += 1;
     update_info();
@@ -308,12 +336,8 @@ pub fn create_entry(filename: String, parent_id: u64, attributes: u8, owner: u8)
     return entry;
 }
 
-pub fn write_file(id: u64, buf: Vec<u8>) -> Result<(), &'static str> {
-    let mut entry: FileEntry = Default::default();
-    match find_entry(id) {
-        Some(e) => entry = e,
-        None => return Err("file not found"),
-    }
+fn write_entry(e: FileEntry, buf: Vec<u8>) -> Result<(), &'static str> {
+    let mut entry = e;
 
     if entry.attributes.get_bit(0) || entry.attributes.get_bit(2) {
         return Err("operation not permitted");

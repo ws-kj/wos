@@ -35,13 +35,39 @@ pub struct FsNode {
 }
 unsafe impl Send for FsNode {}
 
+impl FsNode {
+    pub fn read(&mut self) -> Result<Vec<u8>, &'static str> {
+        match DEVICES.lock().get(self.device) {
+            Some(d) => {
+                match d.system {
+                    System::WFS => return wfs::read_node(self.parent_id, sfn(self.name)),
+                    _ => return Err("operation not supported by filesystem"),
+                }
+            }
+            None => return Err("device not found"),
+        }
+    }
+
+    pub fn write(&mut self, buf: Vec<u8>) -> Result<(), &'static str> {
+        match DEVICES.lock().get(self.device) {
+            Some(d) => {
+                match d.system {
+                    System::WFS => return wfs::write_node(self.parent_id, sfn(self.name), buf),
+                    _ => return Err("operation not supported by filesystem"),
+                }
+            }
+            None => return Err("debice not found"),
+        }
+    }
+}
+
 lazy_static! {
     pub static ref DEVICES: Mutex<Vec<Device>> = Mutex::new(Vec::new());
 }
 
 pub fn install_device(name: String, system: System) -> Result<usize, &'static str> {
     for d in DEVICES.lock().iter() {
-        if name == string_from_filename(d.name) {
+        if name == sfn(d.name) {
             return Err("device with name already exists");
         }
     }
@@ -56,6 +82,7 @@ pub fn install_device(name: String, system: System) -> Result<usize, &'static st
     Ok(s)
 }
 
+
 pub fn find_node(parent_id: u64, name: &'static str, dev_id: usize) -> Result<FsNode, &'static str> {
     match DEVICES.lock().get(dev_id) {
         Some(d) => {
@@ -64,9 +91,21 @@ pub fn find_node(parent_id: u64, name: &'static str, dev_id: usize) -> Result<Fs
                 _ => return Err("operation not supported by filesystem"),
             }
         },
-        None => return Err("file not found"),
+        None => return Err("device not found"),
     }
 }
+
+pub fn create_node(parent_id: u64, filename: &'static str, attributes: u8, owner: u8, dev_id: usize) -> Result<FsNode, &'static str> {
+    match DEVICES.lock().get(dev_id) {
+        Some(d) => {
+            match d.system {
+                System::WFS => return wfs::create_node(parent_id, filename, attributes, owner, dev_id),
+                _ => return Err("operation not supported  by filesystem"),
+            }
+        }
+        None => return Err("device not found"),
+    }
+} 
 
 pub fn nfs(name: String) -> [char; 128] {
     filename_from_slice(name.as_bytes())
@@ -83,7 +122,7 @@ pub fn filename_from_slice(slice: &[u8]) -> [char; 128] {
     return res;
 }
 
-pub fn string_from_filename(filename: [char; 128]) -> String {
+pub fn sfn(filename: [char; 128]) -> String {
     let mut res = String::from("");
     for c in filename.iter() {
         if *c == ' ' { break; }
