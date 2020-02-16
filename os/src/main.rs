@@ -49,16 +49,31 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     println!("");
     println!("wOS v0.1.0    {}", cmos::RTC.lock().get_datetime());
 
-    let mut n = vfs::create_node(0, "Home", 0, 0, 0).unwrap();
+    let mut n = vfs::create_node(0, "Home", 0, 0, 0).unwrap(); 
+    let mut buf: Vec<u8> = Vec::new();
+
+    for i in 0..=255 {
+        buf.push(i);
+        buf.push(b' ');
+    }
     
-    let mut buf: Vec<u8> = String::from("Hello World!").into_bytes();
+    for i in 0..=255 {
+        buf.push(i);
+        buf.push(b' ');
+    }
+    
+
     n.write(buf).unwrap();
     
     println!("Reading file '{}'", vfs::sfn(n.name));
 
     let inbuf = n.read().unwrap();
     for b in inbuf {
-        print!("{}", b as char);
+        if b != b' ' {  
+            print!("{}", b);
+        } else {
+            print!("{}", b as char);
+        }
     }
     println!();
 

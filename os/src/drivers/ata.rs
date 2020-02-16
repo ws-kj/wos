@@ -5,6 +5,7 @@ use alloc::vec::Vec;
 use alloc::string::String;
 use spin::Mutex;
 use lazy_static::lazy_static;
+use crate::timer;
 
 #[repr(u8)]
 pub enum ATACommand {
@@ -165,6 +166,9 @@ pub fn init() {
         io::outb(LBAH, 0);
         io::outb(COMMAND, ATACommand::IdentifyDevice as u8);
 
+        delay();
+        while io::inb(STATUS).get_bit(BSY) { crate::hlt_loop(); }
+
         if io::inb(STATUS) == 0 || io::inb(STATUS) == 0xFF {
             println!("[ATA] master not found.");
         } else {
@@ -179,6 +183,9 @@ pub fn init() {
         io::outb(LBAH, 0);
         io::outb(COMMAND, ATACommand::IdentifyDevice as u8);
 
+        delay();
+        while io::inb(STATUS).get_bit(BSY) { crate::hlt_loop(); }
+
         if io::inb(STATUS) == 0 || io::inb(STATUS) == 0xFF {
             println!("[ATA] slave not found.");
         } else {
@@ -192,6 +199,9 @@ pub fn init() {
         }
 
         io::outb(DRIVESEL, 0xE0);
+
+        delay();
+        while io::inb(STATUS).get_bit(BSY) { crate::hlt_loop(); }
 
         identify_drive();
     }
@@ -239,12 +249,6 @@ pub fn identify_drive() {
 
 pub fn pio28_read(master: bool, lba: usize, count: u8) -> [u8; 512] {
     unsafe {
-  /*      if master {
-            io::outb(DRIVESEL, 0xE0);
-        } else {
-            io::outb(DRIVESEL, 0xF0);
-        }
-*/
         io::outb(FEATURES, 0x00);
         io::outb(SECTOR_COUNT, count);
         io::outb(LBAL, lba.get_bits(24..32) as u8);
@@ -285,15 +289,6 @@ pub fn pio28_write(master: bool, lba: usize, count: u8, sec: [u8; 512]) {
             buf[i] = u16::from_le_bytes([sec[j], sec[j+1]]);
             j += 2;
         }
-/*
-        if master {
-            io::outb(DRIVESEL, 0xE0);
-        } else {
-            io::outb(DRIVESEL, 0xF0);
-        }
-*/
-        //delay();
-        //while io::inb(STATUS).get_bit(BSY) { crate::hlt_loop(); }
 
         io::outb(FEATURES, 0x00);
         io::outb(SECTOR_COUNT, count);
@@ -305,8 +300,8 @@ pub fn pio28_write(master: bool, lba: usize, count: u8, sec: [u8; 512]) {
         io::outb(LBAL, lba.get_bits(0..8) as u8);
         io::outb(LBAM, lba.get_bits(8..16) as u8);
         io::outb(LBAH, lba.get_bits(16..24) as u8);
-      
-  //      delay();
+    
+        delay();
         while io::inb(STATUS).get_bit(BSY) { crate::hlt_loop(); }
 
         io::outb(COMMAND, ATACommand::WriteSectors as u8);
@@ -315,21 +310,23 @@ pub fn pio28_write(master: bool, lba: usize, count: u8, sec: [u8; 512]) {
 
         for i in 0..256 {
             io::outw(DATA, buf[i]);
+            flush_cache();
         }
+
     }
 }
 
 #[no_mangle]
 fn delay() {
-    for _ in 0..80 {}
-
+    for _ in 0..200 {}
+/*
     unsafe {
         io::inb(STATUS);
         io::inb(STATUS);
         io::inb(STATUS);
         io::inb(STATUS);
     }
-//    timer::wait(1);
+//    timer::wait(1); */
 }
 
 fn flush_cache() {

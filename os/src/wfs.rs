@@ -7,6 +7,7 @@ use spin::Mutex;
 use lazy_static::lazy_static;
 use bit_field::BitField;
 use crate::println;
+use crate::print;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::convert::TryInto;
@@ -205,7 +206,7 @@ pub fn read_node(parent_id: u64, filename: String) -> Result<Vec<u8>, &'static s
         Some(e) => {
             return read_entry(e);
         },
-        None => return Err("file not found"),
+        None => return Err("file not found rn"),
     }
 }
 
@@ -262,12 +263,7 @@ fn read_entry(entry: FileEntry) -> Result<Vec<u8>, &'static str> {
     return Ok(ret);
 }
 
-fn delete_file(id: u64) -> Result<(), &'static str> {
-    let mut entry: FileEntry = Default::default(); 
-    match find_entry(id) {
-        Some(e) => entry = e,
-        None => return Err("file not found"),
-    }
+fn delete_entry(entry: FileEntry) -> Result<(), &'static str> {
     ata::pio28_write(ata::ATA_HANDLER.lock().master, entry.location as usize, 1, [0; 512]);
 
     let mut prev = entry_from_sector(ata::pio28_read(ata::ATA_HANDLER.lock().master, entry.prev_entry as usize, 1));
@@ -312,7 +308,7 @@ fn create_entry(filename: String, parent_id: u64, attributes: u8, owner: u8) -> 
         parent_id: parent_id,
         id: f,
         attributes: attributes,
-        t_creation: 0,      //TODO: implement global time format fitting in u64
+        t_creation: 0,      //TODO: implement global time fmt fitting in u64
         t_edit: 0,
         owner: owner,
         size: 0,
@@ -363,7 +359,7 @@ fn write_entry(e: FileEntry, buf: Vec<u8>) -> Result<(), &'static str> {
     if buf.len() % 500 == 0 {
         sec_count = buf.len() / 500;
     } else {
-        sec_count = (buf.len() - (buf.len() % 500)) + 1;
+        sec_count = (buf.len() - (buf.len() % 500)) / 500 + 1;
     }
     let mut data: Vec<[u8; 500]> = Vec::with_capacity(sec_count);
 
@@ -372,19 +368,23 @@ fn write_entry(e: FileEntry, buf: Vec<u8>) -> Result<(), &'static str> {
         let mut sec: [u8; 500] = [0; 500];
 
         if j + 500 > buf.len() {
+            let mut k = 0;
             for l in j..buf.len() {
-                sec[l] = buf[l];
+                sec[k] = buf[l];
+                k += 1;
             }    
         } else {
+            let mut k = 0;
             for l in j..j + 500 {
-                sec[l] = buf[l];
+                sec[k] = buf[l];
+                k += 1;
             }
         }
 
         data.push(sec);
         j += 500;
     }
-
+    println!("{}", data.len());
     let fblock = find_empty_block();
 
     entry.start_sec = fblock as u64;
