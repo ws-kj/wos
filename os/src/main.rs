@@ -49,19 +49,26 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     println!("");
     println!("wOS v0.1.0    {}", cmos::RTC.lock().get_datetime());
 
+
     let mut n = vfs::create_node(0, "Home", 0, 0, 0).unwrap(); 
     let mut buf: Vec<u8> = Vec::new();
 
     for i in 0..=255 {
-        buf.push(i);
-        buf.push(b' ');
+        buf.push(1);
     }
-    
     for i in 0..=255 {
-        buf.push(i);
-        buf.push(b' ');
+        buf.push(2);
     }
-    
+    for i in 0..=255 {
+        buf.push(3);
+    }
+    for i in 0..=255 {
+        buf.push(4);
+    }
+    for i in 0..=255 {
+        buf.push(5);
+    }
+
 
     n.write(buf).unwrap();
     
@@ -69,7 +76,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
     let inbuf = n.read().unwrap();
     for b in inbuf {
-        if b != b' ' {  
+        if b != 32 {  
             print!("{}", b);
         } else {
             print!("{}", b as char);

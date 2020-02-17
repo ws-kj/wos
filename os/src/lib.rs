@@ -15,6 +15,7 @@
 #![allow(unused_variables)]
 #![allow(unused_assignments)]
 #![feature(const_str_as_bytes)]
+#![feature(alloc_layout_extra)]
 
 extern crate alloc;
 

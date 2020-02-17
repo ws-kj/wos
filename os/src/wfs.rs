@@ -367,46 +367,44 @@ fn write_entry(e: FileEntry, buf: Vec<u8>) -> Result<(), &'static str> {
     for i in 0..sec_count {
         let mut sec: [u8; 500] = [0; 500];
 
-        if j + 500 > buf.len() {
-            let mut k = 0;
-            for l in j..buf.len() {
-                sec[k] = buf[l];
-                k += 1;
-            }    
-        } else {
-            let mut k = 0;
-            for l in j..j + 500 {
-                sec[k] = buf[l];
-                k += 1;
+        let mut k = 0;
+        for l in j..j + 500 {
+            if l >= buf.len() {
+                break;
             }
+            sec[k] = buf[l];
+            k += 1;
+            j += 1;
         }
 
         data.push(sec);
-        j += 500;
     }
-    println!("{}", data.len());
+
     let fblock = find_empty_block();
 
     entry.start_sec = fblock as u64;
     entry.size = buf.len() as u64;
     ata::pio28_write(ata::ATA_HANDLER.lock().master, entry.location as usize, 1, sector_from_entry(entry));
 
-    let mut block = fblock; 
+    let mut block = fblock;
+    let mut next = block;
     for i in 0..data.len() {
         let mut sec = [0u8; 512];
         
         for j in 0..4 {
             sec[j] = DATA_SIG[j];
+            //print!("{} ", sec[j]);
         }
         
         for j in 12..512 {
             sec[j] = data[i][j - 12];
+            
         }
 
         ata::pio28_write(ata::ATA_HANDLER.lock().master, block, 1, sec);
         WFS_INFO.lock().blocks_in_use += 1;
 
-        let next = find_empty_block();
+        next = find_empty_block();
 
         let mut j = 4;
         if i == data.len() - 1 {
@@ -604,9 +602,9 @@ fn find_entry_by_name(parent_id: u64, name: String) -> Option<FileEntry> {
 }
 
 fn find_empty_block() -> usize {
-    let first = ata::pio28_read(ata::ATA_HANDLER.lock().master, WFS_INFO.lock().blocks_in_use as usize, 1);
+    let first = ata::pio28_read(ata::ATA_HANDLER.lock().master, (WFS_INFO.lock().blocks_in_use + 1) as usize, 1);
     if String::from_utf8_lossy(&first[0..=3]) != String::from("DATA") {
-        return WFS_INFO.lock().blocks_in_use as usize;
+        return (WFS_INFO.lock().blocks_in_use + 1) as usize;
     }
 
     for i in 1..WFS_INFO.lock().blocks as usize {

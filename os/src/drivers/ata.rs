@@ -1,5 +1,6 @@
 use crate::io;
 use crate::println;
+use crate::print;
 use bit_field::BitField;
 use alloc::vec::Vec;
 use alloc::string::String;
@@ -318,7 +319,7 @@ pub fn pio28_write(master: bool, lba: usize, count: u8, sec: [u8; 512]) {
 
 #[no_mangle]
 fn delay() {
-    for _ in 0..200 {}
+    for _ in 0..200 { print!(""); }
 /*
     unsafe {
         io::inb(STATUS);
