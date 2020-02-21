@@ -50,7 +50,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     println!("wOS v0.1.0    {}", cmos::RTC.lock().get_datetime());
 
 
-    let mut n = vfs::create_node(0, "Home", 0, 0, 0).unwrap(); 
+    let mut n = vfs::create_node(0, String::from("Home"), 0, 0, 0).unwrap(); 
     let mut buf: Vec<u8> = Vec::new();
 
     for i in 0..=255 {
@@ -71,16 +71,21 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
 
     n.write(buf).unwrap();
-    
-    println!("Reading file '{}'", vfs::sfn(n.name));
+   
+    let mut nbuf: Vec<u8> = Vec::new();
 
+    for i in 0..=255 {
+        nbuf.push(6);
+    }
+    for i in 0..=255 {
+        //nbuf.push(7);
+    }
+    n.append(nbuf).unwrap();
+
+    println!("Reading file '{}'", vfs::sfn(n.name));
     let inbuf = n.read().unwrap();
     for b in inbuf {
-        if b != 32 {  
-            print!("{}", b);
-        } else {
-            print!("{}", b as char);
-        }
+        print!("{}", b);   
     }
     println!();
 

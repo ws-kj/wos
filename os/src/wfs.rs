@@ -159,7 +159,7 @@ pub fn init_fs() {
 
 // VFS functions
 
-pub fn find_node(parent_id: u64, name: &'static str, dev_id: usize) -> Result<vfs::FsNode, &'static str> {
+pub fn find_node(parent_id: u64, name: String, dev_id: usize) -> Result<vfs::FsNode, &'static str> {
     match find_entry_by_name(parent_id, name.to_string()) {
         Some(e) => {
             let entry = e;
@@ -180,7 +180,7 @@ pub fn find_node(parent_id: u64, name: &'static str, dev_id: usize) -> Result<vf
     }
 }
 
-pub fn create_node(parent_id: u64, filename: &'static str, attributes: u8, owner: u8, dev_id: usize) -> Result<vfs::FsNode, &'static str> {
+pub fn create_node(parent_id: u64, filename: String, attributes: u8, owner: u8, dev_id: usize) -> Result<vfs::FsNode, &'static str> {
     match find_entry(parent_id) {
         Some(p) => {},
         None => return Err("parent node not found"),
@@ -206,13 +206,20 @@ pub fn read_node(parent_id: u64, filename: String) -> Result<Vec<u8>, &'static s
         Some(e) => {
             return read_entry(e);
         },
-        None => return Err("file not found rn"),
+        None => return Err("file not found"),
     }
 }
 
 pub fn write_node(parent_id: u64, filename: String, buf: Vec<u8>) -> Result<(), &'static str> {
     match find_entry_by_name(parent_id, filename) {
         Some(e) => return write_entry(e, buf),
+        None => return Err("file not found"),
+    }
+}
+
+pub fn append_node(parent_id: u64, filename: String, buf:Vec<u8>) -> Result<(), &'static str> {
+    match find_entry_by_name(parent_id, filename) {
+        Some(e) => return append_entry(e, buf),
         None => return Err("file not found"),
     }
 }
@@ -430,14 +437,10 @@ fn write_entry(e: FileEntry, buf: Vec<u8>) -> Result<(), &'static str> {
     Ok(())
 }
 
-pub fn append_file(id: u64, b: Vec<u8>) -> Result<(), &'static str> {
+pub fn append_entry(e: FileEntry, b: Vec<u8>) -> Result<(), &'static str> {
     let mut buf = b;
-
-    let mut entry: FileEntry = Default::default();
-    match find_entry(id) {
-        Some(e) => entry = e,
-        None => return Err("file not found"),
-    }
+    
+    let mut entry = e;
 
     if entry.attributes.get_bit(0) || entry.attributes.get_bit(2) {
         return Err("operation not permitted");
@@ -456,59 +459,59 @@ pub fn append_file(id: u64, b: Vec<u8>) -> Result<(), &'static str> {
 
             if n == END_OF_CHAIN {
                 sec = raw;
+                //next = n;
                 break;
             }
 
             next = n;
         }
-
-        let secoff = offset + 11 + entry.size as usize;
+        let secoff = offset + 12;
         let mut j = 0;
         for i in secoff..secoff + buf.len() {
-            sec[i] = buf[j];
-            entry.size += 1;
-            buf.remove(j);
             if i >= 512 {
                 break;
             }
+            sec[i] = buf[j];
+            entry.size += 1;
 
             j += 1;
         }
 
         ata::pio28_write(ata::ATA_HANDLER.lock().master, next as usize, 1, sec);
-
         ata::pio28_write(ata::ATA_HANDLER.lock().master, entry.location as usize, 1, sector_from_entry(entry));
+        return Ok(());
     }
-
     if buf.len() == 0 {
         return Ok(());
     }
-
     if buf.len() % 500 == 0 {
         nsec_count = buf.len() / 500;
     } else {
         nsec_count = (buf.len() - (buf.len() % 500)) + 1;
         offset = buf.len() % 500;
     }
-    let mut ndata: Vec<[u8; 500]> = Vec::with_capacity(nsec_count);
 
+    let mut ndata: Vec<[u8; 500]> = Vec::with_capacity(nsec_count);
 
     let mut j = 0;
     for i in 0..nsec_count {
         let mut sec: [u8; 500] = [0; 500];
 
-        if j + 500 > buf.len() {
-            for l in j..buf.len() {
-                sec[l] = buf[l];
+        let mut k = 0;
+        for l in j..j + 500 {
+            if l >= buf.len() {
+                break;
             }
-        } else {
-            for l in j..j + 500 {
-                sec[l] = buf[l];
-            }
+            sec[k] = buf[l];
+            k += 1;
+            j += 1;
         }
 
         ndata.push(sec);
-        j += 500;
+
+        for b in sec.iter() {
+ //         print!("{}", *b);
+        }
     }
 
     let fblock = find_empty_block();
@@ -620,48 +623,56 @@ fn find_empty_block() -> usize {
 
 fn sector_from_entry(f: FileEntry) -> [u8; 512] {
     let mut res: [u8; 512] = [0; 512];
-
-    let mut v: Vec<u8> = Vec::with_capacity(256);
-
+    //let mut v: Vec<u8> = Vec::with_capacity(256);
+    let mut i = 0;
     for b in f.signature.iter() {
-        v.push(*b);
+        res[i] = *b;
+        i += 1;
     }
     for b in f.filename.iter() {
-        v.push(*b as u8);
+        res[i] = *b as u8;
+        i += 1;
     }
     for b in &f.parent_id.to_le_bytes() {
-        v.push(*b);
+        res[i] = *b;
+        i += 1;
     }
     for b in &f.id.to_le_bytes() {
-        v.push(*b);
+        res[i] = *b;
+        i += 1;
     }
-    v.push(f.attributes);
+    res[i] = f.attributes;
+    i += 1;
     for b in &f.t_creation.to_le_bytes() {
-        v.push(*b);
+        res[i] = *b;
+        i += 1;
     }
     for b in &f.t_edit.to_le_bytes() {
-        v.push(*b);
+        res[i] = *b;
+        i += 1;
     }
-    v.push(f.owner);
+    res[i] = f.owner;
+    i += 1;
     for b in &f.size.to_le_bytes() {
-        v.push(*b);
+        res[i] = *b;
+        i += 1;
     }
     for b in &f.start_sec.to_le_bytes() {
-        v.push(*b);
+        res[i] = *b;
+        i += 1;
     }
     for b in &f.next_entry.to_le_bytes() {
-        v.push(*b);
+        res[i] = *b;
+        i += 1;
     }
     for b in &f.prev_entry.to_le_bytes() {
-        v.push(*b);
+        res[i] = *b;
+        i += 1;
     }
     for b in &f.location.to_le_bytes() {
-        v.push(*b); 
+        res[i] = *b;
+        i += 1;
     }
-    for i in 0..v.len() {
-        res[i] = v[i];
-    }
-
     return res;
 }
 

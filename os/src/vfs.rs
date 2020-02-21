@@ -52,11 +52,41 @@ impl FsNode {
         match DEVICES.lock().get(self.device) {
             Some(d) => {
                 match d.system {
-                    System::WFS => return wfs::write_node(self.parent_id, sfn(self.name), buf),
+                    System::WFS => {
+                        let len = buf.len() as u64;
+                        match wfs::write_node(self.parent_id, sfn(self.name), buf) {
+                            Ok(_) => {
+                                self.size = len;
+                                Ok(())
+                            },
+                            Err(s) => Err(s),
+                        }
+                    },
                     _ => return Err("operation not supported by filesystem"),
                 }
             }
-            None => return Err("debice not found"),
+            None => return Err("device not found"),
+        }
+    } 
+
+    pub fn append(&mut self, buf: Vec<u8>) -> Result<(), &'static str> {
+        match DEVICES.lock().get(self.device) {
+            Some(d) => {
+                match d.system {
+                    System::WFS => {
+                        let len = self.size + (buf.len() as u64);
+                        match wfs::append_node(self.parent_id, sfn(self.name), buf) {
+                            Ok(_) => {
+                                self.size = len;
+                                Ok(())
+                            },
+                            Err(s) => Err(s),
+                        }
+                    },
+                    _ => return Err("operation not supported by filesystem"),
+                }
+            },
+            None => return Err("device not found"),
         }
     }
 }
@@ -83,7 +113,7 @@ pub fn install_device(name: String, system: System) -> Result<usize, &'static st
 }
 
 
-pub fn find_node(parent_id: u64, name: &'static str, dev_id: usize) -> Result<FsNode, &'static str> {
+pub fn find_node(parent_id: u64, name: String, dev_id: usize) -> Result<FsNode, &'static str> {
     match DEVICES.lock().get(dev_id) {
         Some(d) => {
             match d.system {
@@ -95,7 +125,7 @@ pub fn find_node(parent_id: u64, name: &'static str, dev_id: usize) -> Result<Fs
     }
 }
 
-pub fn create_node(parent_id: u64, filename: &'static str, attributes: u8, owner: u8, dev_id: usize) -> Result<FsNode, &'static str> {
+pub fn create_node(parent_id: u64, filename: String, attributes: u8, owner: u8, dev_id: usize) -> Result<FsNode, &'static str> {
     match DEVICES.lock().get(dev_id) {
         Some(d) => {
             match d.system {

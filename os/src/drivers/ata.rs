@@ -284,7 +284,6 @@ pub fn pio28_read(master: bool, lba: usize, count: u8) -> [u8; 512] {
 pub fn pio28_write(master: bool, lba: usize, count: u8, sec: [u8; 512]) {
     unsafe {
         let mut buf: [u16; 256] = [0; 256];
-
         let mut j = 0;
         for i in 0..256 {
             buf[i] = u16::from_le_bytes([sec[j], sec[j+1]]);
@@ -301,9 +300,8 @@ pub fn pio28_write(master: bool, lba: usize, count: u8, sec: [u8; 512]) {
         io::outb(LBAL, lba.get_bits(0..8) as u8);
         io::outb(LBAM, lba.get_bits(8..16) as u8);
         io::outb(LBAH, lba.get_bits(16..24) as u8);
-    
         delay();
-        while io::inb(STATUS).get_bit(BSY) { crate::hlt_loop(); }
+        while io::inb(STATUS).get_bit(BSY) {}//crate::hlt_loop(); }
 
         io::outb(COMMAND, ATACommand::WriteSectors as u8);
            
@@ -319,7 +317,7 @@ pub fn pio28_write(master: bool, lba: usize, count: u8, sec: [u8; 512]) {
 
 #[no_mangle]
 fn delay() {
-    for _ in 0..200 { print!(""); }
+    for _ in 0..200 {}
 /*
     unsafe {
         io::inb(STATUS);
