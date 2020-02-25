@@ -8,6 +8,17 @@ use crate::wfs;
 pub const FS_DIR: usize = 0x02;
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub enum Error {
+    FileNotFound,
+    IllegalOperation,
+    PermissionDenied,
+    OperationNotSupported,
+    DeviceNotFound,
+    DuplicateDevice,
+    ReadError,
+}
+
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum System {
     Initrd,
     WFS,
@@ -36,19 +47,19 @@ pub struct FsNode {
 unsafe impl Send for FsNode {}
 
 impl FsNode {
-    pub fn read(&mut self) -> Result<Vec<u8>, &'static str> {
+    pub fn read(&mut self) -> Result<Vec<u8>, Error> {
         match DEVICES.lock().get(self.device) {
             Some(d) => {
                 match d.system {
                     System::WFS => return wfs::read_node(self.parent_id, sfn(self.name)),
-                    _ => return Err("operation not supported by filesystem"),
+                    _ => return Err(Error::OperationNotSupported),
                 }
             }
-            None => return Err("device not found"),
+            None => return Err(Error::DeviceNotFound),
         }
     }
 
-    pub fn write(&mut self, buf: Vec<u8>) -> Result<(), &'static str> {
+    pub fn write(&mut self, buf: Vec<u8>) -> Result<(), Error> {
         match DEVICES.lock().get(self.device) {
             Some(d) => {
                 match d.system {
@@ -62,14 +73,14 @@ impl FsNode {
                             Err(s) => Err(s),
                         }
                     },
-                    _ => return Err("operation not supported by filesystem"),
+                    _ => return Err(Error::OperationNotSupported),
                 }
             }
-            None => return Err("device not found"),
+            None => return Err(Error::DeviceNotFound),
         }
     } 
 
-    pub fn append(&mut self, buf: Vec<u8>) -> Result<(), &'static str> {
+    pub fn append(&mut self, buf: Vec<u8>) -> Result<(), Error> {
         match DEVICES.lock().get(self.device) {
             Some(d) => {
                 match d.system {
@@ -83,10 +94,10 @@ impl FsNode {
                             Err(s) => Err(s),
                         }
                     },
-                    _ => return Err("operation not supported by filesystem"),
+                    _ => return Err(Error::OperationNotSupported),
                 }
             },
-            None => return Err("device not found"),
+            None => return Err(Error::DeviceNotFound),
         }
     }
 }
@@ -95,10 +106,10 @@ lazy_static! {
     pub static ref DEVICES: Mutex<Vec<Device>> = Mutex::new(Vec::new());
 }
 
-pub fn install_device(name: String, system: System) -> Result<usize, &'static str> {
+pub fn install_device(name: String, system: System) -> Result<usize, Error> {
     for d in DEVICES.lock().iter() {
         if name == sfn(d.name) {
-            return Err("device with name already exists");
+            return Err(Error::DuplicateDevice);
         }
     }
 
@@ -113,27 +124,27 @@ pub fn install_device(name: String, system: System) -> Result<usize, &'static st
 }
 
 
-pub fn find_node(parent_id: u64, name: String, dev_id: usize) -> Result<FsNode, &'static str> {
+pub fn find_node(parent_id: u64, name: String, dev_id: usize) -> Result<FsNode, Error> {
     match DEVICES.lock().get(dev_id) {
         Some(d) => {
             match d.system {
                 System::WFS => return wfs::find_node(parent_id, name, dev_id),
-                _ => return Err("operation not supported by filesystem"),
+                _ => return Err(Error::OperationNotSupported),
             }
         },
-        None => return Err("device not found"),
+        None => return Err(Error::DeviceNotFound),
     }
 }
 
-pub fn create_node(parent_id: u64, filename: String, attributes: u8, owner: u8, dev_id: usize) -> Result<FsNode, &'static str> {
+pub fn create_node(parent_id: u64, filename: String, attributes: u8, owner: u8, dev_id: usize) -> Result<FsNode, Error> {
     match DEVICES.lock().get(dev_id) {
         Some(d) => {
             match d.system {
                 System::WFS => return wfs::create_node(parent_id, filename, attributes, owner, dev_id),
-                _ => return Err("operation not supported  by filesystem"),
+                _ => return Err(Error::OperationNotSupported),
             }
         }
-        None => return Err("device not found"),
+        None => return Err(Error::DeviceNotFound),
     }
 } 
 

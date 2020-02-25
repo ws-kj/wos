@@ -159,7 +159,7 @@ pub fn init_fs() {
 
 // VFS functions
 
-pub fn find_node(parent_id: u64, name: String, dev_id: usize) -> Result<vfs::FsNode, &'static str> {
+pub fn find_node(parent_id: u64, name: String, dev_id: usize) -> Result<vfs::FsNode, vfs::Error> {
     match find_entry_by_name(parent_id, name.to_string()) {
         Some(e) => {
             let entry = e;
@@ -176,14 +176,14 @@ pub fn find_node(parent_id: u64, name: String, dev_id: usize) -> Result<vfs::FsN
             };
             return Ok(node);
         },
-        None => return Err("file not found"),
+        None => return Err(vfs::Error::FileNotFound),
     }
 }
 
-pub fn create_node(parent_id: u64, filename: String, attributes: u8, owner: u8, dev_id: usize) -> Result<vfs::FsNode, &'static str> {
+pub fn create_node(parent_id: u64, filename: String, attributes: u8, owner: u8, dev_id: usize) -> Result<vfs::FsNode, vfs::Error> {
     match find_entry(parent_id) {
         Some(p) => {},
-        None => return Err("parent node not found"),
+        None => return Err(vfs::Error::FileNotFound),
     }
 
     let entry = create_entry(filename.to_string(), parent_id, attributes, owner);
@@ -201,32 +201,32 @@ pub fn create_node(parent_id: u64, filename: String, attributes: u8, owner: u8, 
     return Ok(node);
 }
 
-pub fn read_node(parent_id: u64, filename: String) -> Result<Vec<u8>, &'static str> {
+pub fn read_node(parent_id: u64, filename: String) -> Result<Vec<u8>, vfs::Error> {
     match find_entry_by_name(parent_id, filename) {
         Some(e) => {
             return read_entry(e);
         },
-        None => return Err("file not found"),
+        None => return Err(vfs::Error::FileNotFound),
     }
 }
 
-pub fn write_node(parent_id: u64, filename: String, buf: Vec<u8>) -> Result<(), &'static str> {
+pub fn write_node(parent_id: u64, filename: String, buf: Vec<u8>) -> Result<(), vfs::Error> {
     match find_entry_by_name(parent_id, filename) {
         Some(e) => return write_entry(e, buf),
-        None => return Err("file not found"),
+        None => return Err(vfs::Error::FileNotFound),
     }
 }
 
-pub fn append_node(parent_id: u64, filename: String, buf:Vec<u8>) -> Result<(), &'static str> {
+pub fn append_node(parent_id: u64, filename: String, buf:Vec<u8>) -> Result<(), vfs::Error> {
     match find_entry_by_name(parent_id, filename) {
         Some(e) => return append_entry(e, buf),
-        None => return Err("file not found"),
+        None => return Err(vfs::Error::FileNotFound),
     }
 }
 
 //WFS specific functions
 
-fn read_entry(entry: FileEntry) -> Result<Vec<u8>, &'static str> {
+fn read_entry(entry: FileEntry) -> Result<Vec<u8>, vfs::Error> {
     let mut sec_count = 0;
 
     if entry.size % 500 == 0 {
@@ -242,14 +242,10 @@ fn read_entry(entry: FileEntry) -> Result<Vec<u8>, &'static str> {
     for i in 0..sec_count {
         let raw = ata::pio28_read(ata::ATA_HANDLER.lock().master, lba, 1);
 
-        if raw[0..4] != DATA_SIG {
-            return Err("corrupted data block");
-        } 
-
         let next = u64::from_le_bytes(raw[4..12].try_into().expect(""));
 
         if next == FREE || next == RESERVED {
-            return Err("illegal data block access");
+            return Err(vfs::Error::ReadError);
         }
         
         for b in &raw[12..512] {
@@ -270,7 +266,7 @@ fn read_entry(entry: FileEntry) -> Result<Vec<u8>, &'static str> {
     return Ok(ret);
 }
 
-fn delete_entry(entry: FileEntry) -> Result<(), &'static str> {
+fn delete_entry(entry: FileEntry) -> Result<(), vfs::Error> {
     ata::pio28_write(ata::ATA_HANDLER.lock().master, entry.location as usize, 1, [0; 512]);
 
     let mut prev = entry_from_sector(ata::pio28_read(ata::ATA_HANDLER.lock().master, entry.prev_entry as usize, 1));
@@ -278,7 +274,7 @@ fn delete_entry(entry: FileEntry) -> Result<(), &'static str> {
     ata::pio28_write(ata::ATA_HANDLER.lock().master, prev.location as usize, 1, sector_from_entry(prev));
 
     if entry.attributes.get_bit(0) || entry.attributes.get_bit(2) {
-        return Err("operation not permitted");
+        return Err(vfs::Error::IllegalOperation);
     }
 
     if entry.size == 0 || entry.start_sec == 0 || entry.start_sec == END_OF_CHAIN {
@@ -339,11 +335,11 @@ fn create_entry(filename: String, parent_id: u64, attributes: u8, owner: u8) -> 
     return entry;
 }
 
-fn write_entry(e: FileEntry, buf: Vec<u8>) -> Result<(), &'static str> {
+fn write_entry(e: FileEntry, buf: Vec<u8>) -> Result<(), vfs::Error> {
     let mut entry = e;
 
     if entry.attributes.get_bit(0) || entry.attributes.get_bit(2) {
-        return Err("operation not permitted");
+        return Err(vfs::Error::IllegalOperation);
     }
 
     if entry.size > 0 {
@@ -437,10 +433,10 @@ fn write_entry(e: FileEntry, buf: Vec<u8>) -> Result<(), &'static str> {
     Ok(())
 }
 
-pub fn append_entry(e: FileEntry, mut b: Vec<u8>) -> Result<(), &'static str> {
+pub fn append_entry(e: FileEntry, mut b: Vec<u8>) -> Result<(), vfs::Error> {
 
     if e.attributes.get_bit(0) || e.attributes.get_bit(2) {
-        return Err("operation not permitted");
+        return Err(vfs::Error::IllegalOperation);
     }
 
     if e.size == 0 {
