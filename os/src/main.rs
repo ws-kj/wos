@@ -7,7 +7,6 @@
 
 extern crate alloc;
 
-use bit_field::BitField;
 use core::panic::PanicInfo;
 use os::println;
 use bootloader::{entry_point, BootInfo};

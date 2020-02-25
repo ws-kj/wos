@@ -24,6 +24,7 @@ info block: (block 0 reserved)
         u64           total files
         u64           bytes per block
         u64           final entry
+
 file entry: (256 bytes)
         DATA          data signature
         [char; 128]   filename

@@ -5,7 +5,10 @@ use alloc::vec::Vec;
 use core::ptr;
 use crate::wfs;
 
-pub const FS_DIR: usize = 0x02;
+pub const ATTR_RO: usize = 0x00;
+pub const ATTR_SYS: usize = 0x01;
+pub const ATTR_DIR: usize = 0x02;
+pub const ATTR_HDN: usize = 0x03;
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum Error {
@@ -89,6 +92,25 @@ impl FsNode {
                         match wfs::append_node(self.parent_id, sfn(self.name), buf) {
                             Ok(_) => {
                                 self.size = len;
+                                Ok(())
+                            },
+                            Err(s) => Err(s),
+                        }
+                    },
+                    _ => return Err(Error::OperationNotSupported),
+                }
+            },
+            None => return Err(Error::DeviceNotFound),
+        }
+    }
+
+    pub fn delete(&mut self) -> Result<(), Error> {
+        match DEVICES.lock().get(self.device) {
+            Some(d) => {
+                match d.system {
+                    System::WFS => {
+                        match wfs::delete_node(self.parent_id, sfn(self.name)) {
+                            Ok(_) => {
                                 Ok(())
                             },
                             Err(s) => Err(s),

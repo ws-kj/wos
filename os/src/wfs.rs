@@ -224,6 +224,13 @@ pub fn append_node(parent_id: u64, filename: String, buf:Vec<u8>) -> Result<(), 
     }
 }
 
+pub fn delete_node(parent_id: u64, filename: String) -> Result<(), vfs::Error> {
+    match find_entry_by_name(parent_id, filename) {
+        Some(e) => return delete_entry(e),
+        None => return Err(vfs::Error::FileNotFound),
+    }
+}
+
 //WFS specific functions
 
 fn read_entry(entry: FileEntry) -> Result<Vec<u8>, vfs::Error> {
@@ -273,7 +280,7 @@ fn delete_entry(entry: FileEntry) -> Result<(), vfs::Error> {
     prev.next_entry = entry.next_entry;
     ata::pio28_write(ata::ATA_HANDLER.lock().master, prev.location as usize, 1, sector_from_entry(prev));
 
-    if entry.attributes.get_bit(0) || entry.attributes.get_bit(2) {
+    if entry.attributes.get_bit(vfs::ATTR_RO) || entry.attributes.get_bit(vfs::ATTR_DIR) {
         return Err(vfs::Error::IllegalOperation);
     }
 
@@ -338,7 +345,7 @@ fn create_entry(filename: String, parent_id: u64, attributes: u8, owner: u8) -> 
 fn write_entry(e: FileEntry, buf: Vec<u8>) -> Result<(), vfs::Error> {
     let mut entry = e;
 
-    if entry.attributes.get_bit(0) || entry.attributes.get_bit(2) {
+    if entry.attributes.get_bit(vfs::ATTR_RO) || entry.attributes.get_bit(vfs::ATTR_DIR) {
         return Err(vfs::Error::IllegalOperation);
     }
 
@@ -435,7 +442,7 @@ fn write_entry(e: FileEntry, buf: Vec<u8>) -> Result<(), vfs::Error> {
 
 pub fn append_entry(e: FileEntry, mut b: Vec<u8>) -> Result<(), vfs::Error> {
 
-    if e.attributes.get_bit(0) || e.attributes.get_bit(2) {
+    if e.attributes.get_bit(vfs::ATTR_RO) || e.attributes.get_bit(vfs::ATTR_DIR) {
         return Err(vfs::Error::IllegalOperation);
     }
 
