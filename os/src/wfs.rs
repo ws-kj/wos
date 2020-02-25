@@ -305,7 +305,7 @@ fn create_entry(filename: String, parent_id: u64, attributes: u8, owner: u8) -> 
     WFS_INFO.lock().blocks_in_use += 1;
     update_info();
 
-    let block = find_empty_block();
+    let block = find_empty_blocks(1)[0];
 
     let f = WFS_INFO.lock().files;
 
@@ -387,7 +387,7 @@ fn write_entry(e: FileEntry, buf: Vec<u8>) -> Result<(), &'static str> {
         data.push(sec);
     }
 
-    let fblock = find_empty_block();
+    let fblock = find_empty_blocks(1)[0];
 
     entry.start_sec = fblock as u64;
     entry.size = buf.len() as u64;
@@ -411,7 +411,7 @@ fn write_entry(e: FileEntry, buf: Vec<u8>) -> Result<(), &'static str> {
         ata::pio28_write(ata::ATA_HANDLER.lock().master, block, 1, sec);
         WFS_INFO.lock().blocks_in_use += 1;
 
-        next = find_empty_block();
+        next = find_empty_blocks(1)[0];
 
         let mut j = 4;
         if i == data.len() - 1 {
@@ -437,138 +437,111 @@ fn write_entry(e: FileEntry, buf: Vec<u8>) -> Result<(), &'static str> {
     Ok(())
 }
 
-pub fn append_entry(e: FileEntry, b: Vec<u8>) -> Result<(), &'static str> {
-    let mut buf = b;
-    
-    let mut entry = e;
+pub fn append_entry(e: FileEntry, mut b: Vec<u8>) -> Result<(), &'static str> {
 
-    if entry.attributes.get_bit(0) || entry.attributes.get_bit(2) {
+    if e.attributes.get_bit(0) || e.attributes.get_bit(2) {
         return Err("operation not permitted");
     }
 
-    let mut nsec_count = 0;
-    let mut offset = buf.len() % 500;
-    if offset != 0 {
-        let full: [u8; 500] = [0; 500];
-        let mut sec: [u8; 512] = [0; 512];
+    if e.size == 0 {
+        return write_entry(e, b);
+    }
 
-        let mut next = entry.start_sec;
-        loop {
-            let raw = ata::pio28_read(ata::ATA_HANDLER.lock().master, next as usize, 1);
-            let n = u64::from_le_bytes(raw[4..12].try_into().expect(""));
+    let mut buf = b;
+    let finsize = e.size + buf.len() as u64;
+    let mut entry = e;
+    entry.size = finsize;
 
-            if n == END_OF_CHAIN {
-                sec = raw;
-                //next = n;
-                break;
-            }
+    let offset = (e.size as usize) % 500 + 12;
 
-            next = n;
-        }
-        let secoff = offset + 12;
-        let mut j = 0;
-        for i in secoff..secoff + buf.len() {
-            if i >= 512 {
-                break;
-            }
-            sec[i] = buf[j];
-            entry.size += 1;
 
-            j += 1;
+    let mut sec: [u8; 512] = [0; 512];
+
+    let mut next = entry.start_sec;
+    loop {
+        let raw = ata::pio28_read(ata::ATA_HANDLER.lock().master, next as usize, 1);
+        let n = u64::from_le_bytes(raw[4..12].try_into().expect(""));
+
+        if n == END_OF_CHAIN {
+            sec = raw;
+            break;
         }
 
-        ata::pio28_write(ata::ATA_HANDLER.lock().master, next as usize, 1, sec);
-        ata::pio28_write(ata::ATA_HANDLER.lock().master, entry.location as usize, 1, sector_from_entry(entry));
-        return Ok(());
+        next = n;
     }
-    if buf.len() == 0 {
-        return Ok(());
-    }
-    if buf.len() % 500 == 0 {
-        nsec_count = buf.len() / 500;
-    } else {
-        nsec_count = (buf.len() - (buf.len() % 500)) + 1;
-        offset = buf.len() % 500;
-    }
-
-    let mut ndata: Vec<[u8; 500]> = Vec::with_capacity(nsec_count);
 
     let mut j = 0;
-    for i in 0..nsec_count {
-        let mut sec: [u8; 500] = [0; 500];
 
-        let mut k = 0;
-        for l in j..j + 500 {
-            if l >= buf.len() {
-                break;
-            }
-            sec[k] = buf[l];
-            k += 1;
+    if buf.len() <= 512 - offset {
+        for i in offset..offset + buf.len() - 1 {
+            sec[i] = buf[j];
             j += 1;
         }
-
-        ndata.push(sec);
-
-        for b in sec.iter() {
- //         print!("{}", *b);
-        }
-    }
-
-    let fblock = find_empty_block();
-    let mut block = fblock;
-    if entry.size == 0 {
-        entry.start_sec = fblock as u64;
     } else {
-        let mut next = entry.start_sec;
-        loop {
-            let raw = ata::pio28_read(ata::ATA_HANDLER.lock().master, next as usize, 1);
-            let n = u64::from_le_bytes(raw[4..12].try_into().expect(""));
-            if n == END_OF_CHAIN {
-                block = next as usize;
-                break;
-            } 
-
-            next = n;
+        for i in offset..512 {
+            sec[i] = buf[j];
+            j += 1;
         }
     }
 
-    entry.size = entry.size + buf.len() as u64;
+
     ata::pio28_write(ata::ATA_HANDLER.lock().master, entry.location as usize, 1, sector_from_entry(entry));
 
-    for i in 0..ndata.len() {
-        let mut sec = [0u8; 512];
+    if offset + buf.len() - 12 <= 512 {
+        ata::pio28_write(ata::ATA_HANDLER.lock().master, next as usize, 1, sec);
+        return Ok(());
+    }
 
-        for j in 0..4 {
-            sec[j] = DATA_SIG[j];
+    if buf.len() <= 512 - offset {
+        for i in offset..offset + buf.len() - 1 {
+            buf.remove(i);
         }
-
-        for j in 12..512 {
-            sec[j] = ndata[i][j - 12];
+    } else {
+        for i in 0..512 - offset {
+            buf.remove(i);
         }
+    }
 
-        ata::pio28_write(ata::ATA_HANDLER.lock().master, block, 1, sec);
-        WFS_INFO.lock().blocks_in_use += 1;
-        update_info();
+    let sec_count = buf.len() - (buf.len() % 500) + 1;
+    let mut blocks = find_empty_blocks(sec_count);
 
-        let next = find_empty_block();
+    for i in 0..4 {
+        sec[i] = DATA_SIG[i];
+    }
 
+    let mut j = 4;
+    for b in &blocks[0].to_le_bytes() {
+        sec[j] = *b;
+        j += 1;
+    }
+    
+    ata::pio28_write(ata::ATA_HANDLER.lock().master, next as usize, 1, sec);
+    let mut l = 0;
+    for i in 0..sec_count {
         let mut j = 4;
-        if i == ndata.len() - 1 {
+
+        if i == sec_count - 1 {
             for b in &END_OF_CHAIN.to_le_bytes() {
                 sec[j] = *b;
                 j += 1;
             }
         } else {
-            for b in &next.to_le_bytes() {
+            for b in &blocks[i + 1].to_le_bytes() {
                 sec[j] = *b;
                 j += 1;
             }
         }
-        ata::pio28_write(ata::ATA_HANDLER.lock().master, block, 1, sec);
-
-        block = next;
+        for k in 12..512 {
+            if l >= buf.len() {
+                break;
+            }
+            sec[k] = buf[l];
+            l += 1;
+        }   
+        ata::pio28_write(ata::ATA_HANDLER.lock().master, blocks[i], 1, sec);
     }
-    Ok(())
+
+    return Ok(());
 }
 
 fn find_entry(id: u64) -> Option<FileEntry> {
@@ -604,20 +577,38 @@ fn find_entry_by_name(parent_id: u64, name: String) -> Option<FileEntry> {
     }
 }
 
-fn find_empty_block() -> usize {
-    let first = ata::pio28_read(ata::ATA_HANDLER.lock().master, (WFS_INFO.lock().blocks_in_use + 1) as usize, 1);
-    if String::from_utf8_lossy(&first[0..=3]) != String::from("DATA") {
-        return (WFS_INFO.lock().blocks_in_use + 1) as usize;
+fn find_empty_blocks(n: usize) -> Vec<usize> {
+    let mut res: Vec<usize> = Vec::with_capacity(n);
+
+    let mut off = 1;
+    for _ in 0..n {
+        
+        if res.contains(&((WFS_INFO.lock().blocks_in_use + off) as usize)) {
+            off += 1;
+        } else {
+            let first = ata::pio28_read(ata::ATA_HANDLER.lock().master, (WFS_INFO.lock().blocks_in_use + off) as usize, 1);
+            if String::from_utf8_lossy(&first[0..=3]) != String::from("DATA") {
+                res.push((WFS_INFO.lock().blocks_in_use + off) as usize);
+                off += 1;
+                continue;
+            }
+        }
+
+        for i in 1..WFS_INFO.lock().blocks as usize {
+
+            if res.contains(&i) {
+                continue;
+            }
+
+            let raw = ata::pio28_read(ata::ATA_HANDLER.lock().master, i, 1);
+            if String::from_utf8_lossy(&raw[0..=3]) != String::from("DATA") {
+                res.push(i);
+                break;
+            }    
+        }
     }
 
-    for i in 1..WFS_INFO.lock().blocks as usize {
-        let raw = ata::pio28_read(ata::ATA_HANDLER.lock().master, i, 1);
-        if String::from_utf8_lossy(&raw[0..=3]) != String::from("DATA") {
-            return i;
-        }    
-    }
-
-    panic!("[WFS] No free block found.");
+    return res;
 }
 
 

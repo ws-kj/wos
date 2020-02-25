@@ -53,39 +53,33 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     let mut n = vfs::create_node(0, String::from("Home"), 0, 0, 0).unwrap(); 
     let mut buf: Vec<u8> = Vec::new();
 
-    for i in 0..=255 {
-        buf.push(1);
-    }
-    for i in 0..=255 {
-        buf.push(2);
-    }
-    for i in 0..=255 {
-        buf.push(3);
-    }
-    for i in 0..=255 {
-        buf.push(4);
-    }
-    for i in 0..=255 {
-        buf.push(5);
+    for i in 0..250 {
+        buf.push(i);
     }
 
+    for i in 0..250 {
+    //    buf.push(i);
+    }
 
     n.write(buf).unwrap();
    
     let mut nbuf: Vec<u8> = Vec::new();
 
-    for i in 0..=255 {
-        nbuf.push(6);
+    for i in 0..250 {
+        nbuf.push(i);
     }
     for i in 0..=255 {
-        //nbuf.push(7);
+        nbuf.push(i);
+    }
+    for i in 0..100 {
+        nbuf.push(7);
     }
     n.append(nbuf).unwrap();
 
     println!("Reading file '{}'", vfs::sfn(n.name));
     let inbuf = n.read().unwrap();
     for b in inbuf {
-        print!("{}", b);   
+        print!("{} ", b);   
     }
     println!();
 
