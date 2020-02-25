@@ -15,6 +15,8 @@ pub enum Error {
     FileNotFound,
     IllegalOperation,
     PermissionDenied,
+    Closed,
+    AlreadyOpened,
     OperationNotSupported,
     DeviceNotFound,
     DuplicateDevice,
@@ -27,16 +29,17 @@ pub enum System {
     WFS,
 }
 
-#[derive(Copy, Clone)]
 pub struct Device {
     pub name: [char; 128],
     pub system: System,
     pub index: usize,
+    pub opened: Vec<u64>,
 }
 
 #[derive(Clone, Copy)]
 #[repr(C)]
 pub struct FsNode {
+    pub open: bool,
     pub name:   [char; 128],
     pub device: usize,
     pub parent_id: u64,
@@ -50,8 +53,45 @@ pub struct FsNode {
 unsafe impl Send for FsNode {}
 
 impl FsNode {
+    pub fn open(&mut self) -> Result<(), Error> {
+        if self.open { return Err(Error::AlreadyOpened); }
+
+        match DEVICES.lock().get_mut(self.device) {
+            Some(d) => {
+                if d.opened.contains(&self.id) { 
+                    self.open = true;
+                    return Err(Error::AlreadyOpened); 
+                }
+                
+                d.opened.push(self.id);
+                self.open = true;
+            },
+            None => return Err(Error::DeviceNotFound),
+        }
+        Ok(())
+    }
+
+    pub fn close(&mut self) -> Result<(), Error> {
+        if !self.open { return Err(Error::Closed); }
+
+        match DEVICES.lock().get_mut(self.device) {
+            Some(d) => {
+                if d.opened.contains(&self.id) {
+                    d.opened.remove(d.opened.iter().position(|&r| r == self.id).unwrap());
+                }
+
+                self.open = false;
+            },
+            None => return Err(Error::DeviceNotFound),
+        }
+
+        Ok(())
+    }
+
     pub fn read(&mut self) -> Result<Vec<u8>, Error> {
-        match DEVICES.lock().get(self.device) {
+        if !self.open { return Err(Error::Closed); }
+
+        match DEVICES.lock().get_mut(self.device) {
             Some(d) => {
                 match d.system {
                     System::WFS => return wfs::read_node(self.parent_id, sfn(self.name)),
@@ -63,7 +103,9 @@ impl FsNode {
     }
 
     pub fn write(&mut self, buf: Vec<u8>) -> Result<(), Error> {
-        match DEVICES.lock().get(self.device) {
+        if !self.open { return Err(Error::Closed); }
+
+        match DEVICES.lock().get_mut(self.device) {
             Some(d) => {
                 match d.system {
                     System::WFS => {
@@ -84,7 +126,10 @@ impl FsNode {
     } 
 
     pub fn append(&mut self, buf: Vec<u8>) -> Result<(), Error> {
-        match DEVICES.lock().get(self.device) {
+
+        if !self.open { return Err(Error::Closed); }
+
+        match DEVICES.lock().get_mut(self.device) {
             Some(d) => {
                 match d.system {
                     System::WFS => {
@@ -105,7 +150,7 @@ impl FsNode {
     }
 
     pub fn delete(&mut self) -> Result<(), Error> {
-        match DEVICES.lock().get(self.device) {
+        match DEVICES.lock().get_mut(self.device) {
             Some(d) => {
                 match d.system {
                     System::WFS => {
@@ -140,14 +185,14 @@ pub fn install_device(name: String, system: System) -> Result<usize, Error> {
         name: nfs(name),
         system: system,
         index: s,
+        opened: Vec::new(),
     });
 
     Ok(s)
 }
 
-
 pub fn find_node(parent_id: u64, name: String, dev_id: usize) -> Result<FsNode, Error> {
-    match DEVICES.lock().get(dev_id) {
+    match DEVICES.lock().get_mut(dev_id) {
         Some(d) => {
             match d.system {
                 System::WFS => return wfs::find_node(parent_id, name, dev_id),
@@ -159,7 +204,7 @@ pub fn find_node(parent_id: u64, name: String, dev_id: usize) -> Result<FsNode, 
 }
 
 pub fn create_node(parent_id: u64, filename: String, attributes: u8, owner: u8, dev_id: usize) -> Result<FsNode, Error> {
-    match DEVICES.lock().get(dev_id) {
+    match DEVICES.lock().get_mut(dev_id) {
         Some(d) => {
             match d.system {
                 System::WFS => return wfs::create_node(parent_id, filename, attributes, owner, dev_id),

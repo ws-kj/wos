@@ -173,6 +173,7 @@ pub fn find_node(parent_id: u64, name: String, dev_id: usize) -> Result<vfs::FsN
                 t_edit: entry.t_edit,
                 owner: entry.owner,
                 size: entry.size,
+                open: false,
             };
             return Ok(node);
         },
@@ -197,6 +198,7 @@ pub fn create_node(parent_id: u64, filename: String, attributes: u8, owner: u8, 
         t_edit: entry.t_edit,
         owner: entry.owner,
         size: entry.size,
+        open: false,
     };
     return Ok(node);
 }

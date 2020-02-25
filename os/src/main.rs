@@ -49,15 +49,12 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     println!("wOS v0.1.0    {}", cmos::RTC.lock().get_datetime());
 
 
-    let mut n = vfs::create_node(0, String::from("Home"), 0, 0, 0).unwrap(); 
+    let mut n = vfs::create_node(0, String::from("Home"), 0, 0, 0).unwrap();
+    n.open();
     let mut buf: Vec<u8> = Vec::new();
 
     for i in 0..250 {
         buf.push(i);
-    }
-
-    for i in 0..250 {
-    //    buf.push(i);
     }
 
     n.write(buf).unwrap();
@@ -80,6 +77,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     for b in inbuf {
         print!("{} ", b);   
     }
+    n.close();
     println!();
 
     //println!("kernel debug console - enter 'help' for a list of commands\n");
