@@ -332,9 +332,17 @@ fn delete_entry(entry: FileEntry) -> Result<(), vfs::Error> {
         }
         //TODO: Not make this fucking stupid
         ata::pio28_write(ata::ATA_HANDLER.lock().master, next as usize, 1, [0; 512]); 
-
+        WFS_INFO.lock().blocks_in_use -= 1;
         lba = next as usize;
     }
+    update_info();
+
+    if entry.attributes.get_bit(vfs::ATTR_DIR) {
+        for c in get_entry_children(entry)?.iter() {
+            delete_entry(*c)?;
+        }
+    }
+
     Ok(())
 } 
 
