@@ -19,6 +19,7 @@ use os::vfs;
 use alloc::vec::Vec;
 use alloc::string::String;
 use os::print;
+use os::console;
 
 entry_point!(kernel_main);
 
@@ -45,43 +46,13 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     ata::init();
     wfs::init();
 
-    println!("");
-    println!("wOS v0.1.0    {}", cmos::RTC.lock().get_datetime());
-
-
-    let mut n = vfs::create_node(0, String::from("Home"), 0, 0, 0).unwrap();
-    n.open();
-    let mut buf: Vec<u8> = Vec::new();
-
-    for i in 0..250 {
-        buf.push(i);
-    }
-
-    n.write(buf).unwrap();
-   
-    let mut nbuf: Vec<u8> = Vec::new();
-
-    for i in 0..250 {
-        nbuf.push(i);
-    }
-    for i in 0..=255 {
-        nbuf.push(i);
-    }
-    for i in 0..100 {
-        nbuf.push(7);
-    }
-    n.append(nbuf).unwrap();
-
-    println!("Reading file '{}'", vfs::sfn(n.name));
-    let inbuf = n.read().unwrap();
-    for b in inbuf {
-        print!("{} ", b);   
-    }
-    n.close();
     println!();
+    println!("wOS v0.1.0    {}\n", cmos::RTC.lock().get_datetime());
 
-    //println!("kernel debug console - enter 'help' for a list of commands\n");
-    //console::prompt();
+    wfs::demo();
+
+    println!("\nkernel debug console - enter 'help' for a list of commands\n");
+    console::prompt();
     os::hlt_loop();
 }
 

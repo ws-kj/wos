@@ -203,6 +203,9 @@ lazy_static! {
     });
 }
 
+pub fn set_color(fg: Color, bg: Color) {
+    WRITER.lock().color_code = ColorCode::new(fg, bg);
+}
 
 // -----TESTS-----
 

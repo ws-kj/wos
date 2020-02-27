@@ -1,6 +1,7 @@
 //WFS: A shit filesystem
 //Spec can be found at ../wfs_spec.txt
 
+use crate::vga_buffer;
 use crate::vfs;
 use crate::drivers::ata;
 use spin::Mutex;
@@ -37,7 +38,7 @@ pub struct InfoBlock {
 #[repr(C)]
 pub struct FileEntry {
     signature: [u8; 4],
-    filename: [char; 128],
+    name: [char; 128],
     parent_id: u64,
     id: u64,
     attributes: u8,
@@ -54,7 +55,7 @@ impl Default for FileEntry {
     fn default() -> FileEntry {
         FileEntry {
             signature: [0; 4],
-            filename: [' '; 128],
+            name: [' '; 128],
             parent_id: 0,
             id: 0,
             attributes: 0,
@@ -123,7 +124,7 @@ pub fn install_ata() {
     let root_arr: [u8; 512] = [0; 512];
     let root_attributes: u8 = *0.set_bit(0, true).set_bit(1, true).set_bit(2, true);
     let root = FileEntry {
-        filename: filename_from_string(String::from("/")),
+        name: name_from_string(String::from("/")),
         signature: DATA_SIG,
         parent_id: 0,
         id: 0,
@@ -161,7 +162,7 @@ pub fn init_fs() {
 
 pub fn find_node(parent_id: u64, name: String, dev_id: usize) -> Result<vfs::FsNode, vfs::Error> {
     match find_entry_by_name(parent_id, name.to_string()) {
-        Some(e) => {
+        Ok(e) => {
             let entry = e;
             let node = vfs::FsNode {
                 name: vfs::nfs(name.to_string()), 
@@ -177,59 +178,68 @@ pub fn find_node(parent_id: u64, name: String, dev_id: usize) -> Result<vfs::FsN
             };
             return Ok(node);
         },
-        None => return Err(vfs::Error::FileNotFound),
+        Err(e) => return Err(e),
     }
 }
 
-pub fn create_node(parent_id: u64, filename: String, attributes: u8, owner: u8, dev_id: usize) -> Result<vfs::FsNode, vfs::Error> {
+pub fn create_node(parent_id: u64, name: String, attributes: u8, owner: u8, dev_id: usize) -> Result<vfs::FsNode, vfs::Error> {
     match find_entry(parent_id) {
-        Some(p) => {},
-        None => return Err(vfs::Error::FileNotFound),
+        Ok(mut parent) => { 
+            if !parent.attributes.get_bit(vfs::ATTR_DIR) {
+                return Err(vfs::Error::ParentNotDirectory);
+            }
+            let entry = create_entry(name.to_string(), parent_id, attributes, owner);
+            let node = vfs::FsNode {
+                name: vfs::nfs(name.to_string()),
+                device: dev_id,
+                parent_id: parent_id,
+                id: entry.id,
+                attributes: entry.attributes,
+                t_creation: entry.t_creation,
+                t_edit: entry.t_edit,
+                owner: entry.owner,
+                size: entry.size,
+                open: false,
+            };
+
+            //parent.size += 1;
+            append_entry(parent, entry.location.to_le_bytes().to_vec());
+            //ata::pio28_write(ata::ATA_HANDLER.lock().master, parent.location as usize, 1, sector_from_entry(parent));
+
+            return Ok(node);
+        },
+        Err(e) => return Err(e),
     }
 
-    let entry = create_entry(filename.to_string(), parent_id, attributes, owner);
-    let node = vfs::FsNode {
-        name: vfs::nfs(filename.to_string()),
-        device: dev_id,
-        parent_id: parent_id,
-        id: entry.id,
-        attributes: entry.attributes,
-        t_creation: entry.t_creation,
-        t_edit: entry.t_edit,
-        owner: entry.owner,
-        size: entry.size,
-        open: false,
-    };
-    return Ok(node);
 }
 
-pub fn read_node(parent_id: u64, filename: String) -> Result<Vec<u8>, vfs::Error> {
-    match find_entry_by_name(parent_id, filename) {
-        Some(e) => {
+pub fn read_node(parent_id: u64, name: String) -> Result<Vec<u8>, vfs::Error> {
+    match find_entry_by_name(parent_id, name) {
+        Ok(e) => {
             return read_entry(e);
         },
-        None => return Err(vfs::Error::FileNotFound),
+        Err(e)=> return Err(e),
     }
 }
 
-pub fn write_node(parent_id: u64, filename: String, buf: Vec<u8>) -> Result<(), vfs::Error> {
-    match find_entry_by_name(parent_id, filename) {
-        Some(e) => return write_entry(e, buf),
-        None => return Err(vfs::Error::FileNotFound),
+pub fn write_node(parent_id: u64, name: String, buf: Vec<u8>) -> Result<(), vfs::Error> {
+    match find_entry_by_name(parent_id, name) {
+        Ok(e) => return write_entry(e, buf),
+        Err(e) => return Err(e),
     }
 }
 
-pub fn append_node(parent_id: u64, filename: String, buf:Vec<u8>) -> Result<(), vfs::Error> {
-    match find_entry_by_name(parent_id, filename) {
-        Some(e) => return append_entry(e, buf),
-        None => return Err(vfs::Error::FileNotFound),
+pub fn append_node(parent_id: u64, name: String, buf:Vec<u8>) -> Result<(), vfs::Error> {
+    match find_entry_by_name(parent_id, name) {
+        Ok(e) => return append_entry(e, buf),
+        Err(e) => return Err(e),
     }
 }
 
-pub fn delete_node(parent_id: u64, filename: String) -> Result<(), vfs::Error> {
-    match find_entry_by_name(parent_id, filename) {
-        Some(e) => return delete_entry(e),
-        None => return Err(vfs::Error::FileNotFound),
+pub fn delete_node(parent_id: u64, name: String) -> Result<(), vfs::Error> {
+    match find_entry_by_name(parent_id, name) {
+        Ok(e) => return delete_entry(e),
+        Err(e)=> return Err(e),
     }
 }
 
@@ -305,7 +315,7 @@ fn delete_entry(entry: FileEntry) -> Result<(), vfs::Error> {
     Ok(())
 } 
 
-fn create_entry(filename: String, parent_id: u64, attributes: u8, owner: u8) -> FileEntry {
+fn create_entry(name: String, parent_id: u64, attributes: u8, owner: u8) -> FileEntry {
     WFS_INFO.lock().files += 1;
     WFS_INFO.lock().blocks_in_use += 1;
     update_info();
@@ -316,7 +326,7 @@ fn create_entry(filename: String, parent_id: u64, attributes: u8, owner: u8) -> 
 
     let entry = FileEntry {
         signature: DATA_SIG,
-        filename: filename_from_string(filename),
+        name: name_from_string(name),
         parent_id: parent_id,
         id: f,
         attributes: attributes,
@@ -346,10 +356,6 @@ fn create_entry(filename: String, parent_id: u64, attributes: u8, owner: u8) -> 
 
 fn write_entry(e: FileEntry, buf: Vec<u8>) -> Result<(), vfs::Error> {
     let mut entry = e;
-
-    if entry.attributes.get_bit(vfs::ATTR_RO) || entry.attributes.get_bit(vfs::ATTR_DIR) {
-        return Err(vfs::Error::IllegalOperation);
-    }
 
     if entry.size > 0 {
         let mut lba = entry.start_sec as usize;
@@ -444,10 +450,6 @@ fn write_entry(e: FileEntry, buf: Vec<u8>) -> Result<(), vfs::Error> {
 
 pub fn append_entry(e: FileEntry, mut b: Vec<u8>) -> Result<(), vfs::Error> {
 
-    if e.attributes.get_bit(vfs::ATTR_RO) || e.attributes.get_bit(vfs::ATTR_DIR) {
-        return Err(vfs::Error::IllegalOperation);
-    }
-
     if e.size == 0 {
         return write_entry(e, b);
     }
@@ -478,7 +480,7 @@ pub fn append_entry(e: FileEntry, mut b: Vec<u8>) -> Result<(), vfs::Error> {
     let mut j = 0;
 
     if buf.len() <= 512 - offset {
-        for i in offset..offset + buf.len() - 1 {
+        for i in offset..offset + buf.len() {
             sec[i] = buf[j];
             j += 1;
         }
@@ -549,37 +551,57 @@ pub fn append_entry(e: FileEntry, mut b: Vec<u8>) -> Result<(), vfs::Error> {
     return Ok(());
 }
 
-fn find_entry(id: u64) -> Option<FileEntry> {
+fn find_entry(id: u64) -> Result<FileEntry, vfs::Error> {
     let m = ata::ATA_HANDLER.lock().master;
 
     let mut temp = entry_from_sector(ata::pio28_read(m, 1, 1));
     loop {
         if temp.id == id {
-            return Some(temp);
+            return Ok(temp);
         }
 
         if temp.next_entry == END_OF_CHAIN  {
-            return None;
+            return Err(vfs::Error::FileNotFound);
         }
         temp = entry_from_sector(ata::pio28_read(m, temp.next_entry as usize, 1));
     }
 }
 
-fn find_entry_by_name(parent_id: u64, name: String) -> Option<FileEntry> {
+fn find_entry_by_name(parent_id: u64, name: String) -> Result<FileEntry, vfs::Error> {
     let m = ata::ATA_HANDLER.lock().master;
 
+    match find_entry(parent_id) {
+        Ok(parent) => {
+            let locations = read_entry(parent)?; 
+            
+            for i in 0..locations.len() / 8 {
+                if i * 8 + 8 > locations.len() {
+                    return Err(vfs::Error::FileNotFound);
+                }
+                let e = entry_from_sector(ata::pio28_read(ata::ATA_HANDLER.lock().master, u64::from_le_bytes(locations[i*8..i*8+8].try_into().expect("")) as usize, 1));
+
+                if vfs::sfn(e.name) == name {
+                    return Ok(e);
+                }
+            }
+        
+            return Err(vfs::Error::FileNotFound);
+        },
+        Err(e) => return Err(e),
+    }
+/*
     let mut temp = entry_from_sector(ata::pio28_read(m, 1, 1));
     loop {
-        if string_from_filename(temp.filename) == name && temp.parent_id == parent_id {
-            return Some(temp);
+        if string_from_name(temp.name) == name && temp.parent_id == parent_id {
+            return Ok(temp);
         }
 
         if temp.next_entry == END_OF_CHAIN {
-            return None;
+            return Err(vfs::Error::FileNotFound);
         }
 
         temp = entry_from_sector(ata::pio28_read(m, temp.next_entry as usize, 1));
-    }
+    }*/
 }
 
 fn find_empty_blocks(n: usize) -> Vec<usize> {
@@ -625,7 +647,7 @@ fn sector_from_entry(f: FileEntry) -> [u8; 512] {
         res[i] = *b;
         i += 1;
     }
-    for b in f.filename.iter() {
+    for b in f.name.iter() {
         res[i] = *b as u8;
         i += 1;
     }
@@ -675,10 +697,10 @@ fn sector_from_entry(f: FileEntry) -> [u8; 512] {
 fn entry_from_sector(sec: [u8; 512]) -> FileEntry {
     let res = FileEntry {
         signature: sec[0..4].try_into().expect("sig"),
-        filename: filename_from_slice(&sec[4..132]),
+        name: name_from_slice(&sec[4..132]),
         parent_id: u64::from_le_bytes(sec[132..140].try_into().expect("pid")),
         id: u64::from_le_bytes(sec[140..148].try_into().expect("id")),
-        attributes: sec[149],
+        attributes: sec[148],
         t_creation: u64::from_le_bytes(sec[150..158].try_into().expect("tc")),
         t_edit: u64::from_le_bytes(sec[158..166].try_into().expect("te")),
         owner: sec[166],
@@ -691,7 +713,7 @@ fn entry_from_sector(sec: [u8; 512]) -> FileEntry {
     return res;
 }
 
-fn filename_from_string(s: String) -> [char; 128] {
+fn name_from_string(s: String) -> [char; 128] {
     let mut res: [char; 128] = [' '; 128];
 
     let mut i = 0;
@@ -733,7 +755,7 @@ fn update_info() {
     ata::pio28_write(ata::ATA_HANDLER.lock().master, 0, 1, info);
 }
 
-fn filename_from_slice(slice: &[u8]) -> [char; 128] {
+fn name_from_slice(slice: &[u8]) -> [char; 128] {
     let mut res: [char; 128] = [' '; 128];
     let mut i = 0;
     for b in slice {
@@ -744,9 +766,9 @@ fn filename_from_slice(slice: &[u8]) -> [char; 128] {
     return res;
 }
 
-fn string_from_filename(filename: [char; 128]) -> String {
+fn string_from_name(name: [char; 128]) -> String {
     let mut res = String::from("");
-    for c in filename.iter() {
+    for c in name.iter() {
         if *c == ' ' { break; }
         res.push(*c);
     }
@@ -760,3 +782,35 @@ unsafe fn as_u8_slice<T: Sized>(p: &T) -> &[u8] {
     )
 }
 
+pub fn demo() {
+    println!("[Demo] Creating and opening file 'test'...");
+    let mut n = vfs::create_node(0, String::from("test"), 0, 0, 0).unwrap();
+    n.open();
+
+    println!("[Demo] Writing to file...");
+    n.write(b"Hello, world!\n".to_vec()).unwrap();
+
+    println!("[Demo] Reading file...\n");
+    let buffer = n.read().unwrap();
+
+    vga_buffer::set_color(vga_buffer::Color::LightBlue, vga_buffer::Color::Black);
+    for b in buffer {
+        print!("{}", b as char);
+    } 
+    vga_buffer::set_color(vga_buffer::Color::White, vga_buffer::Color::Black);
+
+    println!("\n[Demo] Appending data...");
+    n.append(b"This is another line!\n".to_vec()).unwrap();
+
+    println!("[Demo] Reading again...\n");
+    let buffer = n.read().unwrap();
+
+    vga_buffer::set_color(vga_buffer::Color::LightBlue, vga_buffer::Color::Black);
+    for b in buffer {
+        print!("{}", b as char);   
+    }
+    vga_buffer::set_color(vga_buffer::Color::White, vga_buffer::Color::Black);
+
+    println!("\n[Demo] Closing file...");
+    n.close();
+}

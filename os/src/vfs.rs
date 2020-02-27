@@ -18,6 +18,7 @@ pub enum Error {
     Closed,
     AlreadyOpened,
     OperationNotSupported,
+    ParentNotDirectory,
     DeviceNotFound,
     DuplicateDevice,
     ReadError,

@@ -264,7 +264,7 @@ pub fn pio28_read(master: bool, lba: usize, count: u8) -> [u8; 512] {
         io::outb(COMMAND, ATACommand::ReadSectors as u8);
 
         delay();
-        while io::inb(STATUS).get_bit(BSY) { crate::hlt_loop(); }
+        while io::inb(STATUS).get_bit(BSY) {}
 
         let mut sector: [u8; 512] = [0; 512];
 
@@ -317,7 +317,7 @@ pub fn pio28_write(master: bool, lba: usize, count: u8, sec: [u8; 512]) {
 
 #[no_mangle]
 fn delay() {
-    for _ in 0..200 {}
+    for _ in 0..300 {}
 /*
     unsafe {
         io::inb(STATUS);

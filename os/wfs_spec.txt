@@ -27,7 +27,7 @@ info block: (block 0 reserved)
 
 file entry: (256 bytes)
         DATA          data signature
-        [char; 128]   filename
+        [char; 128]   name
         u64           parent id
         u64           id
         u8            attributes
