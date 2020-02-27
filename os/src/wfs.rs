@@ -239,7 +239,34 @@ pub fn append_node(parent_id: u64, name: String, buf:Vec<u8>) -> Result<(), vfs:
 pub fn delete_node(parent_id: u64, name: String) -> Result<(), vfs::Error> {
     match find_entry_by_name(parent_id, name) {
         Ok(e) => return delete_entry(e),
-        Err(e)=> return Err(e),
+        Err(e) => return Err(e),
+    }
+}
+
+pub fn get_children(parent_id: u64, name: String, dev_id: usize) -> Result<Vec<vfs::FsNode>, vfs::Error> {
+    match find_entry_by_name(parent_id, name) {
+        Ok(e) => {
+            let entries = get_entry_children(e)?;
+            let mut ret: Vec<vfs::FsNode> = Vec::with_capacity(entries.len());
+
+            for entry in entries {
+                ret.push(vfs::FsNode {
+                    name: entry.name, 
+                    device: dev_id,
+                    parent_id: e.id,
+                    id: entry.id,
+                    attributes: entry.attributes,
+                    t_creation: entry.t_creation,
+                    t_edit: entry.t_edit,
+                    owner: entry.owner,
+                    size: entry.size,
+                    open: false,
+                });
+            }
+            
+            return Ok(ret);
+        },
+        Err(e) => return Err(e),
     }
 }
 
@@ -586,7 +613,7 @@ fn find_entry_by_name(parent_id: u64, name: String) -> Result<FileEntry, vfs::Er
     }
 }
 
-fn get_children(e: FileEntry) -> Result<Vec<FileEntry>, vfs::Error> {
+fn get_entry_children(e: FileEntry) -> Result<Vec<FileEntry>, vfs::Error> {
     if !e.attributes.get_bit(vfs::ATTR_DIR) {
         return Err(vfs::Error::IllegalOperation);
     }

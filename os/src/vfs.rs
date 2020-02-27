@@ -127,7 +127,6 @@ impl FsNode {
     } 
 
     pub fn append(&mut self, buf: Vec<u8>) -> Result<(), Error> {
-
         if !self.open { return Err(Error::Closed); }
 
         match DEVICES.lock().get_mut(self.device) {
@@ -151,18 +150,25 @@ impl FsNode {
     }
 
     pub fn delete(&mut self) -> Result<(), Error> {
+        if !self.open { return Err(Error::Closed) };
+
         match DEVICES.lock().get_mut(self.device) {
             Some(d) => {
                 match d.system {
-                    System::WFS => {
-                        match wfs::delete_node(self.parent_id, sfn(self.name)) {
-                            Ok(_) => {
-                                Ok(())
-                            },
-                            Err(s) => Err(s),
-                        }
-                    },
+                    System::WFS => return wfs::delete_node(self.parent_id, sfn(self.name)),
                     _ => return Err(Error::OperationNotSupported),
+                }
+            },
+            None => return Err(Error::DeviceNotFound),
+        }
+    }
+
+    pub fn get_children(&mut self) -> Result<Vec<FsNode>, Error> {
+        match DEVICES.lock().get_mut(self.device) {
+            Some(d) => {
+                match d.system {
+                    System::WFS => return wfs::get_children(self.parent_id, sfn(self.name), self.device),
+                    _ => return Err(Error::OperationNotSupported), 
                 }
             },
             None => return Err(Error::DeviceNotFound),
