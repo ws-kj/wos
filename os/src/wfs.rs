@@ -124,7 +124,7 @@ pub fn install_ata() {
     let root_arr: [u8; 512] = [0; 512];
     let root_attributes: u8 = *0.set_bit(0, true).set_bit(1, true).set_bit(2, true);
     let root = FileEntry {
-        name: name_from_string(String::from("/")),
+        name: vfs::nfs(String::from("/")),
         signature: DATA_SIG,
         parent_id: 0,
         id: 0,
@@ -292,10 +292,6 @@ fn delete_entry(entry: FileEntry) -> Result<(), vfs::Error> {
     prev.next_entry = entry.next_entry;
     ata::pio28_write(ata::ATA_HANDLER.lock().master, prev.location as usize, 1, sector_from_entry(prev));
 
-    if entry.attributes.get_bit(vfs::ATTR_RO) || entry.attributes.get_bit(vfs::ATTR_DIR) {
-        return Err(vfs::Error::IllegalOperation);
-    }
-
     if entry.size == 0 || entry.start_sec == 0 || entry.start_sec == END_OF_CHAIN {
         return Ok(());
     }
@@ -326,7 +322,7 @@ fn create_entry(name: String, parent_id: u64, attributes: u8, owner: u8) -> File
 
     let entry = FileEntry {
         signature: DATA_SIG,
-        name: name_from_string(name),
+        name: vfs::nfs(name),
         parent_id: parent_id,
         id: f,
         attributes: attributes,
@@ -448,8 +444,7 @@ fn write_entry(e: FileEntry, buf: Vec<u8>) -> Result<(), vfs::Error> {
     Ok(())
 }
 
-pub fn append_entry(e: FileEntry, mut b: Vec<u8>) -> Result<(), vfs::Error> {
-
+fn append_entry(e: FileEntry, mut b: Vec<u8>) -> Result<(), vfs::Error> {
     if e.size == 0 {
         return write_entry(e, b);
     }
@@ -589,27 +584,34 @@ fn find_entry_by_name(parent_id: u64, name: String) -> Result<FileEntry, vfs::Er
         },
         Err(e) => return Err(e),
     }
-/*
-    let mut temp = entry_from_sector(ata::pio28_read(m, 1, 1));
-    loop {
-        if string_from_name(temp.name) == name && temp.parent_id == parent_id {
-            return Ok(temp);
-        }
-
-        if temp.next_entry == END_OF_CHAIN {
-            return Err(vfs::Error::FileNotFound);
-        }
-
-        temp = entry_from_sector(ata::pio28_read(m, temp.next_entry as usize, 1));
-    }*/
 }
+
+fn get_children(e: FileEntry) -> Result<Vec<FileEntry>, vfs::Error> {
+    if !e.attributes.get_bit(vfs::ATTR_DIR) {
+        return Err(vfs::Error::IllegalOperation);
+    }
+
+    let locations = read_entry(e)?;
+    let mut res: Vec<FileEntry> = Vec::with_capacity(e.size as usize / 8);
+
+    for i in 0..locations.len() / 8 {
+        if i * 8 + 8 > locations.len() {
+            break;
+        }
+        let e = entry_from_sector(ata::pio28_read(ata::ATA_HANDLER.lock().master, u64::from_le_bytes(locations[i*8..i*8+8].try_into().expect("")) as usize, 1));
+        res.push(e);
+    }
+
+    Ok(res)
+}
+
 
 fn find_empty_blocks(n: usize) -> Vec<usize> {
     let mut res: Vec<usize> = Vec::with_capacity(n);
 
     let mut off = 1;
+
     for _ in 0..n {
-        
         if res.contains(&((WFS_INFO.lock().blocks_in_use + off) as usize)) {
             off += 1;
         } else {
@@ -622,7 +624,6 @@ fn find_empty_blocks(n: usize) -> Vec<usize> {
         }
 
         for i in 1..WFS_INFO.lock().blocks as usize {
-
             if res.contains(&i) {
                 continue;
             }
@@ -641,7 +642,6 @@ fn find_empty_blocks(n: usize) -> Vec<usize> {
 
 fn sector_from_entry(f: FileEntry) -> [u8; 512] {
     let mut res: [u8; 512] = [0; 512];
-    //let mut v: Vec<u8> = Vec::with_capacity(256);
     let mut i = 0;
     for b in f.signature.iter() {
         res[i] = *b;
@@ -713,17 +713,6 @@ fn entry_from_sector(sec: [u8; 512]) -> FileEntry {
     return res;
 }
 
-fn name_from_string(s: String) -> [char; 128] {
-    let mut res: [char; 128] = [' '; 128];
-
-    let mut i = 0;
-    for c in s.chars() {
-        res[i] = c;
-        i += 1;
-    }
-    return res;
-}
-
 fn update_info() {
     let mut bufv: Vec<u8> = Vec::new();
     
@@ -764,22 +753,6 @@ fn name_from_slice(slice: &[u8]) -> [char; 128] {
         i += 1;
     }
     return res;
-}
-
-fn string_from_name(name: [char; 128]) -> String {
-    let mut res = String::from("");
-    for c in name.iter() {
-        if *c == ' ' { break; }
-        res.push(*c);
-    }
-    return res;
-}
-
-unsafe fn as_u8_slice<T: Sized>(p: &T) -> &[u8] {
-    ::core::slice::from_raw_parts(
-        (p as *const T) as *const u8,
-        mem::size_of::<T>(),
-    )
 }
 
 pub fn demo() {
