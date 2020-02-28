@@ -10,6 +10,7 @@ use crate::drivers::cmos;
 use crate::vfs;
 use crate::console;
 use bit_field::BitField;
+use crate::print;
 
 pub struct Command {
     com_name: String,
@@ -57,14 +58,14 @@ pub fn init() {
         func: ls_fn,
     };
     init_command(String::from("ls"), ls);
-/*
+
     let read = Command {
         com_name: String::from("read"),
         desc: String::from("get contents of a file"),
         func: read_fn,
     };
     init_command(String::from("read"), read);
-
+/*
     let info = Command {
         com_name: String::from("info"),
         desc: String::from("get info about file(s)"),
@@ -147,29 +148,42 @@ pub fn ls_fn(args: Vec<String>) {
         }
     }
 }
-/*
+
 pub fn read_fn(args: Vec<String>) {
     if args.len() <= 1 {
         println!("please specify a file");
-        return ();
+        return;
     }
 
-    //let node = vfs::get_child(&vfs::FS_ROOT.lock().node, args[1].clone());
-    unsafe {
-        let node = vfs::get_node(&mut(*console::get_wd()), args[1].clone());
-        match node {
-            Some(n) => {
-                if ((*n).flags&0x7 == vfs::FS_DIR) && (*n).length == 0 {
-                    println!("{} is a directory", (*n).name);
-                } else {
-                    println!("{}", str::from_utf8(&vfs::read(&mut(*n))).unwrap());
-                }
-            },
-            None => println!("file not found: {}", &args[1]),
-        }
+    match vfs::find_node(console::get_cdir().id, args[1].clone(), 0) {
+        Ok(mut n) => {
+            match n.open() {
+                Ok(()) => {},
+                Err(e) => {
+                    println!("could not open file: {}", &args[1]);
+                    return;
+                },
+            }
+
+            match n.read() {
+                Ok(buf) => {
+                    for b in buf.iter() {
+                        print!("{}", *b as char);
+                    }
+                },
+                Err(e) => println!("could not read file: {}", &args[1]),
+            }
+            println!();
+            match n.close() {
+                Ok(()) => {},
+                Err(e) => println!("could not close file: {}", &args[1]),
+            }
+        },
+        Err(e) => println!("file not found: {}", &args[1]),
     }
+
 }
-
+/*
 pub fn info_fn(args: Vec<String>) {
     for i in 1..args.len() { unsafe {
         let node = vfs::get_node(&mut(*console::get_wd()), args[i].clone());

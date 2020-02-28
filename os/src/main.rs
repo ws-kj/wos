@@ -54,7 +54,10 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     println!("kernel debug console - enter 'help' for a list of commands\n");
     console::init();
 
-    vfs::create_node(1, String::from("hello.txt"), 0, 0, 0).unwrap();
+    let mut hello = vfs::create_node(1, String::from("hello.txt"), 0, 0, 0).unwrap();
+    hello.open();
+    hello.write(b"Welcome to the wOS filesystem, wFS!\n".to_vec());
+    hello.close();
 
     os::hlt_loop();
 }
