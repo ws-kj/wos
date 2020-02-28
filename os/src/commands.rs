@@ -7,6 +7,9 @@ use alloc::string::String;
 use crate::vga_buffer;
 use crate::println;
 use crate::drivers::cmos;
+use crate::vfs;
+use crate::console;
+use bit_field::BitField;
 
 pub struct Command {
     com_name: String,
@@ -47,14 +50,14 @@ pub fn init() {
         func: time_fn,
     };
     init_command(String::from("time"), time);
-/*
+
     let ls = Command {
         com_name: String::from("ls"),
         desc: String::from("list files"),
         func: ls_fn,
     };
     init_command(String::from("ls"), ls);
-
+/*
     let read = Command {
         com_name: String::from("read"),
         desc: String::from("get contents of a file"),
@@ -68,17 +71,18 @@ pub fn init() {
         func: info_fn,
     };
     init_command(String::from("info"), info);
-
-    let pwd = Command {
-        com_name: String::from("pwd"),
-        desc: String::from("print working directory"),
-        func: pwd_fn,
+*/
+    let pcd = Command {
+        com_name: String::from("pcd"),
+        desc: String::from("print current directory"),
+        func: pcd_fn,
     };
-    init_command(String::from("pwd"), pwd);
 
+    init_command(String::from("pcd"), pcd);
+/*
     let cd = Command {
         com_name: String::from("cd"),
-        desc: String::from("change working directory"),
+        desc: String::from("change current directory"),
         func: cd_fn,
     };
     init_command(String::from("cd"), cd);
@@ -133,33 +137,17 @@ pub fn help_fn(args: Vec<String>) {
 pub fn time_fn(args: Vec<String>) {
     println!("{}", cmos::RTC.lock().get_datetime());
 }
-/*
+
 pub fn ls_fn(args: Vec<String>) {
-
-    let mut node = console::get_wd();
-
-    if args.len() > 1 { unsafe {
-        match vfs::get_node(&mut(*console::get_wd()), args[1].clone()) {
-            Some(n) => node = n,
-            None => {
-                println!("file not found: {}", &args[1]);
-                return ();
-            },
-        }
-    }}
-
-    unsafe {
-        for c in (*node).children.iter() {
-            print!("{}", (*(*c)).name);
-            if (*(*c)).flags&0x7 == vfs::FS_DIR {
-                println!("/");
-            } else {
-                println!();
-            }
+    for c in console::get_cdir().get_children().unwrap().iter() {
+        if c.attributes.get_bit(vfs::ATTR_DIR) {
+            println!("{}/", vfs::sfn(c.name));
+        } else {
+            println!("{}", vfs::sfn(c.name));
         }
     }
 }
-
+/*
 pub fn read_fn(args: Vec<String>) {
     if args.len() <= 1 {
         println!("please specify a file");
@@ -197,10 +185,11 @@ pub fn info_fn(args: Vec<String>) {
         println!(); 
     }}
 }
-
-pub fn pwd_fn(args: Vec<String>) {
-    unsafe { println!("{}", (*console::get_wd()).name); }
+*/
+pub fn pcd_fn(args: Vec<String>) {
+    println!("{}/", vfs::sfn(console::get_cdir().name));
 }
+/*
 
 pub fn cd_fn(args: Vec<String>) {
     if args.len() == 1 { 

@@ -7,20 +7,29 @@ use lazy_static::lazy_static;
 use spin::Mutex;
 use crate::stdin;
 use crate::commands;
+use crate::vfs;
 
 pub struct Console {
-    cdir: String,
+    cdir: Option<vfs::FsNode>,
+    cdev: usize,
 }
 unsafe impl Send for Console {}
 
 lazy_static! {
     pub static ref CONSOLE: Mutex<Console> = Mutex::new(Console {
-        cdir: String::from("/"),   
+        cdir: None,
+        cdev: 0,
     });
 }
 
+pub fn init() {
+    CONSOLE.lock().cdir = Some(vfs::find_node(0, String::from("ATA0"), 0).unwrap());
+
+    prompt();
+}
+
 pub fn prompt() {
-    print!("{}", CONSOLE.lock().cdir);
+    print!("{}/", vfs::sfn(CONSOLE.lock().cdir.unwrap().name));
 
     vga_buffer::set_color(vga_buffer::Color::LightCyan, vga_buffer::Color::Black);
     print!(" >>> ");
@@ -41,12 +50,12 @@ pub fn process_command(com: String) {
     }
 }
 
-/*
-pub fn get_cdir() -> *mut vfs::FsNode {
-    CONSOLE.lock().cdir
+
+pub fn get_cdir() -> vfs::FsNode {
+    CONSOLE.lock().cdir.unwrap()
 }
 
-pub fn set_cdir(node: &mut vfs::FsNode) {
-    CONSOLE.lock().cdir = node;
+pub fn set_cdir(node: vfs::FsNode) {
+    CONSOLE.lock().cdir = Some(node);
 }
-*/
+

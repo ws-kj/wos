@@ -317,7 +317,7 @@ pub fn pio28_write(master: bool, lba: usize, count: u8, sec: [u8; 512]) {
 
 #[no_mangle]
 fn delay() {
-    for _ in 0..300 {}
+    for _ in 0..100 {}
 /*
     unsafe {
         io::inb(STATUS);

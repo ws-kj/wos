@@ -1,6 +1,7 @@
 //WFS: A shit filesystem
 //Spec can be found at ../wfs_spec.txt
 
+use crate::timer;
 use crate::vga_buffer;
 use crate::vfs;
 use crate::drivers::ata;
@@ -124,7 +125,7 @@ pub fn install_ata() {
     let root_arr: [u8; 512] = [0; 512];
     let root_attributes: u8 = *0.set_bit(0, true).set_bit(1, true).set_bit(2, true);
     let root = FileEntry {
-        name: vfs::nfs(String::from("/")),
+        name: vfs::nfs(String::from("")),
         signature: DATA_SIG,
         parent_id: 0,
         id: 0,
@@ -142,6 +143,12 @@ pub fn install_ata() {
     println!("[WFS] Writing Root file entry to ATA drive.");
     ata::pio28_write(ata::ATA_HANDLER.lock().master, 1, 1, root_arr);
     init_fs();
+
+    let r = vfs::create_node(0, String::from("ATA0"), *0.set_bit(vfs::ATTR_DIR, true).set_bit(vfs::ATTR_SYS, true), 0, 0).unwrap();
+
+    let mut s = entry_from_sector(ata::pio28_read(ata::ATA_HANDLER.lock().master, 1, 1));
+    s.next_entry = 3;
+    ata::pio28_write(ata::ATA_HANDLER.lock().master, 1, 1, sector_from_entry(s));
 }
 
 pub fn init_fs() {
@@ -184,7 +191,7 @@ pub fn find_node(parent_id: u64, name: String, dev_id: usize) -> Result<vfs::FsN
 
 pub fn create_node(parent_id: u64, name: String, attributes: u8, owner: u8, dev_id: usize) -> Result<vfs::FsNode, vfs::Error> {
     match find_entry(parent_id) {
-        Ok(mut parent) => { 
+        Ok(mut parent) => {
             if !parent.attributes.get_bit(vfs::ATTR_DIR) {
                 return Err(vfs::Error::ParentNotDirectory);
             }
@@ -371,16 +378,18 @@ fn create_entry(name: String, parent_id: u64, attributes: u8, owner: u8) -> File
         location: block as u64,
     };
     let arr = sector_from_entry(entry);
-    
+    ata::pio28_write(ata::ATA_HANDLER.lock().master, entry.location as usize, 1, arr); 
+
     let mut prev = entry_from_sector(ata::pio28_read(ata::ATA_HANDLER.lock().master, WFS_INFO.lock().final_entry as usize, 1));
+
+    for i in 0..1000 {};
+
     prev.next_entry = entry.location;
-    let prev_arr = sector_from_entry(prev);
-    ata::pio28_write(ata::ATA_HANDLER.lock().master, prev.location as usize, 1, prev_arr);
-    
+    ata::pio28_write(ata::ATA_HANDLER.lock().master, prev.location as usize, 1, sector_from_entry(prev));
+
+
     WFS_INFO.lock().final_entry = entry.location;
     update_info();
-
-    ata::pio28_write(ata::ATA_HANDLER.lock().master, entry.location as usize, 1, arr); 
 
     return entry;
 }

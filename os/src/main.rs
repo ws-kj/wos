@@ -47,12 +47,15 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     wfs::init();
 
     println!();
-    println!("wOS v0.1.0    {}\n", cmos::RTC.lock().get_datetime());
+    println!("wOS v0.1.0    {}", cmos::RTC.lock().get_datetime());
 
-    wfs::demo();
+    //wfs::demo();
 
-    println!("\nkernel debug console - enter 'help' for a list of commands\n");
-    console::prompt();
+    println!("kernel debug console - enter 'help' for a list of commands\n");
+    console::init();
+
+    vfs::create_node(1, String::from("hello.txt"), 0, 0, 0).unwrap();
+
     os::hlt_loop();
 }
 
