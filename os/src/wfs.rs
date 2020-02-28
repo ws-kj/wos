@@ -321,6 +321,23 @@ fn read_entry(entry: FileEntry) -> Result<Vec<u8>, vfs::Error> {
 
 fn delete_entry(entry: FileEntry) -> Result<(), vfs::Error> {
     ata::pio28_write(ata::ATA_HANDLER.lock().master, entry.location as usize, 1, [0; 512]);
+    WFS_INFO.lock().blocks_in_use -= 1;
+    update_info();
+
+    let mut parent = find_entry(entry.parent_id)?;
+    let mut buf = read_entry(parent)?;
+    
+    let mut j = 0;
+    loop {
+        if u64::from_le_bytes(buf[j*8..j*8+8].try_into().expect("")) == entry.location {
+            for i in j*8..j*8+8 {
+                buf.remove(j*8);
+            }
+            write_entry(parent, buf)?;
+            break;
+        }
+        j += 1;
+    }
 
     let mut prev = entry_from_sector(ata::pio28_read(ata::ATA_HANDLER.lock().master, entry.prev_entry as usize, 1));
     prev.next_entry = entry.next_entry;
@@ -338,11 +355,19 @@ fn delete_entry(entry: FileEntry) -> Result<(), vfs::Error> {
             break;
         }
         //TODO: Not make this fucking stupid
+        for i in 0..1000 {}
         ata::pio28_write(ata::ATA_HANDLER.lock().master, next as usize, 1, [0; 512]); 
+        for i in 0..1000 {}
         WFS_INFO.lock().blocks_in_use -= 1;
         lba = next as usize;
     }
     update_info();
+
+    if entry.attributes.get_bit(vfs::ATTR_DIR) {
+        for e in get_entry_children(entry)? {
+            delete_entry(e);
+        }
+    }
 
     if entry.attributes.get_bit(vfs::ATTR_DIR) {
         for c in get_entry_children(entry)?.iter() {
@@ -440,6 +465,9 @@ fn write_entry(e: FileEntry, buf: Vec<u8>) -> Result<(), vfs::Error> {
 
     let fblock = find_empty_blocks(1)[0];
 
+    WFS_INFO.lock().blocks_in_use += 1;
+    update_info();
+
     entry.start_sec = fblock as u64;
     entry.size = buf.len() as u64;
     ata::pio28_write(ata::ATA_HANDLER.lock().master, entry.location as usize, 1, sector_from_entry(entry));
@@ -463,6 +491,8 @@ fn write_entry(e: FileEntry, buf: Vec<u8>) -> Result<(), vfs::Error> {
         WFS_INFO.lock().blocks_in_use += 1;
 
         next = find_empty_blocks(1)[0];
+        WFS_INFO.lock().blocks_in_use += 1;
+        update_info();
 
         let mut j = 4;
         if i == data.len() - 1 {
@@ -784,7 +814,6 @@ fn update_info() {
     for i in 0..bufv.len() {
         info[i] = bufv[i];
     }
-
     ata::pio28_write(ata::ATA_HANDLER.lock().master, 0, 1, info);
 }
 
@@ -831,3 +860,4 @@ pub fn demo() {
     println!("\n[Demo] Closing file...");
     n.close();
 }
+

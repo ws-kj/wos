@@ -249,6 +249,8 @@ pub fn identify_drive() {
 }
 
 pub fn pio28_read(master: bool, lba: usize, count: u8) -> [u8; 512] {
+
+    for i in 0..500 {}
     unsafe {
         io::outb(FEATURES, 0x00);
         io::outb(SECTOR_COUNT, count);
@@ -282,6 +284,9 @@ pub fn pio28_read(master: bool, lba: usize, count: u8) -> [u8; 512] {
 }
     
 pub fn pio28_write(master: bool, lba: usize, count: u8, sec: [u8; 512]) {
+
+    for i in 0..500 {}
+
     unsafe {
         let mut buf: [u16; 256] = [0; 256];
         let mut j = 0;
