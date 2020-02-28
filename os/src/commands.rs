@@ -13,7 +13,7 @@ use bit_field::BitField;
 use crate::print;
 
 pub struct Command {
-    com_name: String,
+    name: String,
     desc: String,
     func: fn(args: Vec<String>),
 }
@@ -25,71 +25,91 @@ lazy_static! {
 
 pub fn init() {
     let clear = Command {
-        com_name: String::from("clear"),
+        name: String::from("clear"),
         desc: String::from("clear the screen"),
         func: clear_fn,
     };
     init_command(String::from("clear"), clear);
 
     let echo = Command {
-        com_name: String::from("echo"),
+        name: String::from("echo"),
         desc: String::from("write a string to the screen"),
         func: echo_fn,
     };
     init_command(String::from("echo"), echo);
 
     let help = Command {
-        com_name: String::from("help"),
+        name: String::from("help"),
         desc: String::from("list commands and descriptions"),
         func: help_fn,
     };
     init_command(String::from("help"), help);
 
     let time = Command {
-        com_name: String::from("time"),
+        name: String::from("time"),
         desc: String::from("get the current time and date"),
         func: time_fn,
     };
     init_command(String::from("time"), time);
 
     let ls = Command {
-        com_name: String::from("ls"),
+        name: String::from("ls"),
         desc: String::from("list files"),
         func: ls_fn,
     };
     init_command(String::from("ls"), ls);
 
     let read = Command {
-        com_name: String::from("read"),
+        name: String::from("read"),
         desc: String::from("get contents of a file"),
         func: read_fn,
     };
     init_command(String::from("read"), read);
-/*
+
     let info = Command {
-        com_name: String::from("info"),
+        name: String::from("info"),
         desc: String::from("get info about file(s)"),
         func: info_fn,
     };
     init_command(String::from("info"), info);
-*/
+
     let pcd = Command {
-        com_name: String::from("pcd"),
+        name: String::from("pcd"),
         desc: String::from("print current directory"),
         func: pcd_fn,
     };
-
     init_command(String::from("pcd"), pcd);
+
+    let mkf = Command {
+        name: String::from("mkf"),
+        desc: String::from("create file"),
+        func: mkf_fn,
+    };
+    init_command(String::from("mkf"), mkf);
+
+    let write = Command {
+        name: String::from("write"),
+        desc: String::from("write to file"),
+        func: write_fn,
+    };
+    init_command(String::from("write"), write);
+
+    let del = Command {
+        name: String::from("del"),
+        desc: String::from("delete file"),
+        func: del_fn,
+    };
+    init_command(String::from("del"), del);
 /*
     let cd = Command {
-        com_name: String::from("cd"),
+        name: String::from("cd"),
         desc: String::from("change current directory"),
         func: cd_fn,
     };
     init_command(String::from("cd"), cd);
 
     let mv = Command {
-        com_name: String::from("mv"),
+        name: String::from("mv"),
         desc: String::from("move file"),
         func: mv_fn,
     };
@@ -123,13 +143,13 @@ pub fn help_fn(args: Vec<String>) {
     if args.len() > 1 {
         match COMMANDS.lock().get(&args[1]) {
             Some(com) => {
-                println!("{} - {}", com.com_name, com.desc);
+                println!("{} - {}", com.name, com.desc);
             },
             None => println!("help: command not found: {}", args[0]),
         }
     } else { 
         for (n, com) in COMMANDS.lock().iter() {
-            println!("{} - {}", com.com_name, com.desc);
+            println!("{} - {}", com.name, com.desc);
         }
     }
             
@@ -164,7 +184,6 @@ pub fn read_fn(args: Vec<String>) {
                     return;
                 },
             }
-
             match n.read() {
                 Ok(buf) => {
                     for b in buf.iter() {
@@ -183,25 +202,98 @@ pub fn read_fn(args: Vec<String>) {
     }
 
 }
-/*
+
 pub fn info_fn(args: Vec<String>) {
-    for i in 1..args.len() { unsafe {
-        let node = vfs::get_node(&mut(*console::get_wd()), args[i].clone());
-        match node {
-            Some(n) => { 
-                println!("file: {}", (*n).name);
-                println!("    flags: {}", (*n).flags);
-                println!("    length: {}B", (*n).length);
-                println!("    children: {}", (*n).children.len());
-            },
-            None => println!("file not found: {}", &args[i]),
-        }
-        println!(); 
-    }}
+    if args.len() <= 1 {
+        println!("please specify a file");
+        return;
+    }
+
+    match vfs::find_node(console::get_cdir().id, args[1].clone(), 0) {
+        Ok(n) => {
+            println!("{}", vfs::sfn(n.name));
+            println!("owner: {}", n.owner);
+            println!("size: {}B", n.size);
+            println!("created: {}", n.t_creation);
+            println!("edited: {}", n.t_edit);
+        },
+        Err(e) => println!("file not found: {}", &args[1]),
+    }
 }
-*/
+
 pub fn pcd_fn(args: Vec<String>) {
     println!("{}/", vfs::sfn(console::get_cdir().name));
+}
+
+pub fn mkf_fn(args: Vec<String>) {
+    match vfs::create_node(console::get_cdir().id, args[1].clone(), 0, 0, 0) {
+        Ok(n) => return,
+        Err(e) => println!("could not create file"),
+    }
+}
+
+pub fn write_fn(args: Vec<String>) {
+    if args.len() <= 1 {
+        println!("please specify a file");
+        return;
+    }
+
+    let n_name = args[1].clone();
+    let mut a = args;
+    a.remove(0);
+    a.remove(0);
+    let text = a.join(" ").into_bytes();
+
+    match vfs::find_node(console::get_cdir().id, n_name, 0) {
+        Ok(mut n) => {
+            match n.open() {
+                Ok(()) => {},
+                Err(e) => {
+                    println!("could not open file: {}", &a[1]);
+                    return;
+                },
+            }
+            match n.append(text) {
+                Ok(()) => {},
+                Err(e) => println!("could not write to file: {}", &a[1]),
+            }
+            match n.close() {
+                Ok(()) => {},
+                Err(e) => println!("could not close file: {}", &a[1]),
+            }
+        },
+        Err(e) => println!("file not found: {}", &a[1]),
+    }
+}
+
+pub fn del_fn(args: Vec<String>) {
+    if args.len() <= 1 {
+        println!("Please specify a file!");
+        return;
+    }
+    
+
+    match vfs::find_node(console::get_cdir().id, args[1].clone(), 0) {
+        Ok(mut n) => {
+            match n.open() {
+                Ok(()) => {},
+                Err(e) => {
+                    println!("could not open file: {}", &args[1]);
+                    return;
+                },
+            }
+            match n.delete() {
+                Ok(()) => {},
+                Err(e) => println!("could not delete file: {}", &args[1]),
+            }
+            match n.close() {
+                Ok(()) => {},
+                Err(e) => println!("could not close file: {}", &args[1]),
+            }
+        },
+        Err(e) => println!("file not found: {}", &args[1]),
+    }
+
 }
 /*
 
