@@ -271,6 +271,27 @@ pub fn get_root(dev_id: usize) -> Result<vfs::FsNode, vfs::Error> {
     }
 }
 
+pub fn find_node_by_id(id: u64, dev_id: usize) -> Result<vfs::FsNode, vfs::Error> {
+    match find_entry(id) {
+        Ok(e) => {
+            let node = vfs::FsNode {
+                name: e.name, 
+                device: dev_id,
+                parent_id: e.parent_id,
+                id: e.id,
+                attributes: e.attributes,
+                t_creation: e.t_creation,
+                t_edit: e.t_edit,
+                owner: e.owner,
+                size: e.size,
+                open: false,
+            };
+            return Ok(node);
+        },
+        Err(e) => return Err(e),
+    }
+}
+
 pub fn get_children(parent_id: u64, name: String, dev_id: usize) -> Result<Vec<vfs::FsNode>, vfs::Error> {
     match find_entry_by_name(parent_id, name) {
         Ok(e) => {
@@ -298,14 +319,36 @@ pub fn get_children(parent_id: u64, name: String, dev_id: usize) -> Result<Vec<v
     }
 }
 
+pub fn get_parent(id: u64, dev_id: usize) -> Result<vfs::FsNode, vfs::Error> {
+    let mut e = find_entry(id)?;
+
+    if e.id != 1 {
+        e = find_entry(e.parent_id)?;
+    }
+
+    let node = vfs::FsNode {
+        name: e.name, 
+        device: dev_id,
+        parent_id: e.parent_id,
+        id: e.id,
+        attributes: e.attributes,
+        t_creation: e.t_creation,
+        t_edit: e.t_edit,
+        owner: e.owner,
+        size: e.size,
+        open: false,
+    };
+    return Ok(node);
+}
+
 //WFS specific functions
 
 fn read_entry(entry: FileEntry) -> Result<Vec<u8>, vfs::Error> {
-    let mut sec_count = 0;
+let mut sec_count = 0;
 
-    if entry.size % 500 == 0 {
-        sec_count = entry.size / 500;
-    } else {
+if entry.size % 500 == 0 {
+sec_count = entry.size / 500;
+} else {
         sec_count = (entry.size - (entry.size % 500)) + 1;
     }
 

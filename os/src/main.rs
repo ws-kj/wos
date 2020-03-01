@@ -20,6 +20,7 @@ use alloc::vec::Vec;
 use alloc::string::String;
 use os::print;
 use os::console;
+use alloc::string::ToString;
 
 entry_point!(kernel_main);
 
@@ -58,10 +59,6 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     hello.open();
     hello.write(b"Welcome to the wOS filesystem, wFS!\n".to_vec());
     hello.close();
-
-    let mut new = vfs::find_node_from_path(String::from("A:/hello.txt")).unwrap();
-    println!("{}", vfs::sfn(new.name));
-    os::hlt_loop();
 }
 
 #[cfg(not(test))]

@@ -200,6 +200,18 @@ pub fn install_device(name: String, system: System) -> Result<usize, Error> {
     Ok(s)
 }
 
+pub fn find_node_by_id(id: u64, dev_id: usize) -> Result<FsNode, Error> {
+    match DEVICES.lock().get_mut(dev_id) {
+        Some(d) => {
+            match d.system {
+                System::WFS => return wfs::find_node_by_id(id, dev_id),
+                _ => return Err(Error::OperationNotSupported),
+            }
+        },
+        None => return Err(Error::DeviceNotFound),
+    }
+}
+
 pub fn find_node(parent_id: u64, name: String, dev_id: usize) -> Result<FsNode, Error> {
     match DEVICES.lock().get_mut(dev_id) {
         Some(d) => {
@@ -236,7 +248,50 @@ pub fn get_root(dev_id: usize) -> Result<FsNode, Error> {
     }
 }
 
-pub fn find_node_from_path(path: String) -> Result<FsNode, Error> {
+pub fn get_parent(id: u64, dev_id: usize) -> Result<FsNode, Error> {
+    match DEVICES.lock().get(dev_id) {
+        Some(d) => {
+            match d.system {
+                System::WFS => return wfs::get_parent(id, dev_id),
+                _ => return Err(Error::OperationNotSupported),
+            }
+        },
+        None => return Err(Error::DeviceNotFound),
+    }
+}
+
+pub fn node_from_local_path(p: &FsNode, path: String) -> Result<FsNode, Error> {
+    let mut names: Vec<&str> = path.split("/").collect();
+    let dev_id = (*p).device;
+
+    let goal = names[names.len() - 1];
+    let mut parent = *p;
+
+    let mut i = 0;
+    loop {
+        if i >= names.len() {
+            break;
+        }
+
+        if names[i] == ".." {
+            parent = get_parent(parent.id, dev_id)?;
+            i += 1;
+            continue;
+        }
+
+        let node = find_node(parent.id, names[i].to_string(), dev_id)?;
+
+        if &sfn(node.name) == goal {
+            return Ok(node);
+        }
+        
+        parent = node;
+        i += 1;
+    }
+    return Err(Error::FileNotFound);
+}
+
+pub fn node_from_path(path: String) -> Result<FsNode, Error> {
     let mut names: Vec<&str> = path.split("/").collect();
     let mut dev_id = 0;
    
@@ -245,12 +300,9 @@ pub fn find_node_from_path(path: String) -> Result<FsNode, Error> {
             dev_id = d.index;
         }
     }
-
     names.remove(0);
+
     let goal = names[names.len() - 1];
-
-    let mut i = 0;
-
     let mut parent = get_root(dev_id)?;
     
     let mut i = 0;
