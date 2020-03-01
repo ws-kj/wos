@@ -23,7 +23,7 @@ lazy_static! {
 }
 
 pub fn init() {
-    CONSOLE.lock().cdir = Some(vfs::find_node(0, String::from("ATA0"), 0).unwrap());
+    CONSOLE.lock().cdir = Some(vfs::get_root(0).unwrap());
 
     prompt();
 }

@@ -144,7 +144,7 @@ pub fn install_ata() {
     ata::pio28_write(ata::ATA_HANDLER.lock().master, 1, 1, root_arr);
     init_fs();
 
-    let r = vfs::create_node(0, String::from("ATA0"), *0.set_bit(vfs::ATTR_DIR, true).set_bit(vfs::ATTR_SYS, true), 0, 0).unwrap();
+    let r = vfs::create_node(0, String::from("A:"), *0.set_bit(vfs::ATTR_DIR, true).set_bit(vfs::ATTR_SYS, true), 0, 0).unwrap();
 
     let mut s = entry_from_sector(ata::pio28_read(ata::ATA_HANDLER.lock().master, 1, 1));
     s.next_entry = 3;
@@ -162,7 +162,7 @@ pub fn init_fs() {
     WFS_INFO.lock().bytes_per_block = u64::from_le_bytes(info_block[33..=40].try_into().expect(""));
     WFS_INFO.lock().final_entry = u64::from_le_bytes(info_block[41..49].try_into().expect(""));
 
-    vfs::install_device(String::from("ATA0"), vfs::System::WFS);
+    vfs::install_device(String::from("A:"), vfs::System::WFS);
 }
 
 // VFS functions
@@ -246,6 +246,27 @@ pub fn append_node(parent_id: u64, name: String, buf:Vec<u8>) -> Result<(), vfs:
 pub fn delete_node(parent_id: u64, name: String) -> Result<(), vfs::Error> {
     match find_entry_by_name(parent_id, name) {
         Ok(e) => return delete_entry(e),
+        Err(e) => return Err(e),
+    }
+}
+
+pub fn get_root(dev_id: usize) -> Result<vfs::FsNode, vfs::Error> {
+    match find_entry(1) {
+        Ok(e) => {
+            let node = vfs::FsNode {
+                name: e.name, 
+                device: dev_id,
+                parent_id: e.parent_id,
+                id: e.id,
+                attributes: e.attributes,
+                t_creation: e.t_creation,
+                t_edit: e.t_edit,
+                owner: e.owner,
+                size: e.size,
+                open: false,
+            };
+            return Ok(node);
+        },
         Err(e) => return Err(e),
     }
 }

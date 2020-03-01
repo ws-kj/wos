@@ -4,6 +4,8 @@ use alloc::string::{ToString, String};
 use alloc::vec::Vec;
 use core::ptr;
 use crate::wfs;
+use crate::println;
+
 
 pub const ATTR_RO: usize = 0x00;
 pub const ATTR_SYS: usize = 0x01;
@@ -217,10 +219,58 @@ pub fn create_node(parent_id: u64, filename: String, attributes: u8, owner: u8, 
                 System::WFS => return wfs::create_node(parent_id, filename, attributes, owner, dev_id),
                 _ => return Err(Error::OperationNotSupported),
             }
-        }
+        },
         None => return Err(Error::DeviceNotFound),
     }
 } 
+
+pub fn get_root(dev_id: usize) -> Result<FsNode, Error> {
+    match DEVICES.lock().get(dev_id) {
+        Some(d) => {
+            match d.system {
+                System::WFS => return wfs::get_root(dev_id),
+                _ => return Err(Error::OperationNotSupported),
+            }
+        },
+        None => return Err(Error::DeviceNotFound),
+    }
+}
+
+pub fn find_node_from_path(path: String) -> Result<FsNode, Error> {
+    let mut names: Vec<&str> = path.split("/").collect();
+    let mut dev_id = 0;
+   
+    for d in DEVICES.lock().iter() {
+        if sfn(d.name) == names[0] {
+            dev_id = d.index;
+        }
+    }
+
+    names.remove(0);
+    let goal = names[names.len() - 1];
+
+    let mut i = 0;
+
+    let mut parent = get_root(dev_id)?;
+    
+    let mut i = 0;
+    loop {
+        if i >= names.len() {
+            break;
+        }
+
+        let node = find_node(parent.id, names[i].to_string(), dev_id)?;
+        
+        if &sfn(node.name) == goal {
+            return Ok(node);
+        }
+        
+        parent = node;
+        i += 1;
+    }
+
+    return Err(Error::FileNotFound);
+}
 
 pub fn nfs(name: String) -> [char; 128] {
     filename_from_slice(name.as_bytes())
