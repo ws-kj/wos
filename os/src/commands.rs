@@ -163,7 +163,7 @@ pub fn ls_fn(args: Vec<String>) {
     let mut node = console::get_cdir();
 
     if args.len() > 1 {
-        match vfs::node_from_local_path(&console::get_cdir(), args[1].clone()) {
+    match vfs::node_from_local_path(&console::get_cdir(), args[1].clone()) {
             Ok(n) => node = n,
             Err(e) => {
                 println!("file not found: {}", &args[1]);
@@ -194,8 +194,12 @@ pub fn read_fn(args: Vec<String>) {
         return;
     }
 
-    match vfs::find_node(console::get_cdir().id, args[1].clone(), 0) {
+    match vfs::node_from_local_path(&console::get_cdir(), args[1].clone()) {
         Ok(mut n) => {
+            if n.attributes.get_bit(vfs::ATTR_DIR) {
+                println!("cannot read a directory (try `ls`)");
+                return;
+            }
             match n.open() {
                 Ok(()) => {},
                 Err(e) => {
@@ -228,7 +232,7 @@ pub fn info_fn(args: Vec<String>) {
         return;
     }
 
-    match vfs::find_node(console::get_cdir().id, args[1].clone(), 0) {
+    match vfs::node_from_local_path(&console::get_cdir(), args[1].clone()) {
         Ok(n) => {
             println!("{}", vfs::sfn(n.name));
             println!("owner: {}", n.owner);
