@@ -1,3 +1,4 @@
+
 #![no_std]
 #![no_main]
 #![feature(custom_test_frameworks)]
@@ -59,6 +60,8 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     hello.open();
     hello.write(b"Welcome to the wOS filesystem, wFS!\n".to_vec());
     hello.close();
+
+    os::hlt_loop();
 }
 
 #[cfg(not(test))]

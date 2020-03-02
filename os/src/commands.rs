@@ -160,7 +160,26 @@ pub fn time_fn(args: Vec<String>) {
 }
 
 pub fn ls_fn(args: Vec<String>) {
-    for c in console::get_cdir().get_children().unwrap().iter() {
+    let mut node = console::get_cdir();
+
+    if args.len() > 1 {
+        match vfs::node_from_local_path(&console::get_cdir(), args[1].clone()) {
+            Ok(n) => node = n,
+            Err(e) => {
+                println!("file not found: {}", &args[1]);
+                return;
+            },
+        }
+    }
+    
+    let mut children: Vec<vfs::FsNode> = Vec::new();
+
+    match node.get_children() {
+        Ok(v) => children = v,
+        Err(e) => println!("could not get children: {}", vfs::sfn(node.name)),
+    }
+
+    for c in children.iter() {
         if c.attributes.get_bit(vfs::ATTR_DIR) {
             println!("{}/", vfs::sfn(c.name));
         } else {
@@ -238,13 +257,13 @@ pub fn write_fn(args: Vec<String>) {
         return;
     }
 
-    let n_name = args[1].clone();
+    let path = args[1].clone();
     let mut a = args;
     a.remove(0);
     a.remove(0);
     let text = a.join(" ").into_bytes();
 
-    match vfs::find_node(console::get_cdir().id, n_name, 0) {
+    match vfs::node_from_local_path(&console::get_cdir(), path) {
         Ok(mut n) => {
             match n.open() {
                 Ok(()) => {},
@@ -272,8 +291,7 @@ pub fn del_fn(args: Vec<String>) {
         return;
     }
     
-
-    match vfs::find_node(console::get_cdir().id, args[1].clone(), 0) {
+    match vfs::node_from_local_path(&console::get_cdir(), args[1].clone()) {
         Ok(mut n) => {
             match n.open() {
                 Ok(()) => {},

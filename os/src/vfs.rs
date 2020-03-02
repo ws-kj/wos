@@ -275,6 +275,10 @@ pub fn node_from_local_path(p: &FsNode, path: String) -> Result<FsNode, Error> {
 
         if names[i] == ".." {
             parent = get_parent(parent.id, dev_id)?;
+            if i == names.len() - 2 {
+                return Ok(parent);
+            } 
+
             i += 1;
             continue;
         }
