@@ -100,14 +100,14 @@ pub fn init() {
         func: del_fn,
     };
     init_command(String::from("del"), del);
-/*
+
     let cd = Command {
         name: String::from("cd"),
         desc: String::from("change current directory"),
         func: cd_fn,
     };
     init_command(String::from("cd"), cd);
-
+/*
     let mv = Command {
         name: String::from("mv"),
         desc: String::from("move file"),
@@ -322,22 +322,23 @@ pub fn del_fn(args: Vec<String>) {
     }
 
 }
-/*
 
 pub fn cd_fn(args: Vec<String>) {
-    if args.len() == 1 { 
-        console::set_wd(&mut vfs::FS_ROOT.lock().node);
-        return ();
+    if args.len() <= 1 {
+        console::set_cdir(vfs::get_root(0).unwrap());
+        return;
     }
 
-    unsafe { 
-        match vfs::get_node(&mut(*console::get_wd()), args[1].clone()) {
-            Some(n) => console::set_wd(&mut(*n)),
-            None => println!("file not found: {}", &args[1]),
-        }
+    match vfs::node_from_local_path(&console::get_cdir(), args[1].clone()) {
+        Ok(n) => {
+            console::set_cdir(n);
+            return;
+        },
+        Err(e) => println!("file not found: {}", &args[1]),
     }
 }
 
+/*
 pub fn mv_fn(args: Vec<String>) { unsafe {
     if args.len() != 3 {
         println!("please specify a file and a destination");

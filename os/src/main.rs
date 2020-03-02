@@ -22,6 +22,7 @@ use alloc::string::String;
 use os::print;
 use os::console;
 use alloc::string::ToString;
+use bit_field::BitField;
 
 entry_point!(kernel_main);
 
@@ -55,6 +56,8 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     hello.open();
     hello.write(b"Welcome to the wOS filesystem, wFS!\n".to_vec());
     hello.close();
+
+    vfs::create_node(1, String::from("Home"), *0u8.set_bit(vfs::ATTR_DIR, true), 0, 0).unwrap();
 
     os::hlt_loop();
 }
