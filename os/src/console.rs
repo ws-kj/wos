@@ -1,3 +1,5 @@
+use crate::drivers::cmos; 
+use crate::println;
 use alloc::vec::Vec;
 use crate::print;
 use alloc::string::String;
@@ -25,6 +27,9 @@ lazy_static! {
 pub fn init() {
     CONSOLE.lock().cdir = Some(vfs::get_root(0).unwrap());
 
+    println!("wOS v0.1.0    {}", cmos::RTC.lock().get_datetime());
+    //wfs::demo();
+    println!("kernel debug console - enter 'help' for a list of commands\n");
     prompt();
 }
 

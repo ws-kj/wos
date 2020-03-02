@@ -260,11 +260,19 @@ pub fn get_parent(id: u64, dev_id: usize) -> Result<FsNode, Error> {
     }
 }
 
-pub fn node_from_local_path(p: &FsNode, path: String) -> Result<FsNode, Error> {
+pub fn node_from_local_path(p: &FsNode, pa: String) -> Result<FsNode, Error> {
+    let mut path = pa;
+   
+    let pchars: Vec<char> = path.chars().collect();
+    if pchars[pchars.len() - 1] == '/' {
+        path.pop();
+    }
+
     let mut names: Vec<&str> = path.split("/").collect();
     let dev_id = (*p).device;
 
     let goal = names[names.len() - 1];
+
     let mut parent = *p;
 
     let mut i = 0;
@@ -275,7 +283,7 @@ pub fn node_from_local_path(p: &FsNode, path: String) -> Result<FsNode, Error> {
 
         if names[i] == ".." {
             parent = get_parent(parent.id, dev_id)?;
-            if i == names.len() - 2 {
+            if i == names.len() - 1 {
                 return Ok(parent);
             } 
 

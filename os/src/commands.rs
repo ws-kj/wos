@@ -265,6 +265,12 @@ pub fn write_fn(args: Vec<String>) {
 
     match vfs::node_from_local_path(&console::get_cdir(), path) {
         Ok(mut n) => {
+
+            if n.attributes.get_bit(vfs::ATTR_DIR) {
+                println!("{} is a directory", &a[1]);
+                return;
+            }
+
             match n.open() {
                 Ok(()) => {},
                 Err(e) => {
