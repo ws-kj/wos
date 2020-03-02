@@ -252,8 +252,8 @@ pub fn mkf_fn(args: Vec<String>) {
 }
 
 pub fn write_fn(args: Vec<String>) {
-    if args.len() <= 1 {
-        println!("please specify a file");
+    if args.len() <= 2 {
+        println!("please specify a file and at least one word");
         return;
     }
 
@@ -263,14 +263,13 @@ pub fn write_fn(args: Vec<String>) {
     a.remove(0);
     let text = a.join(" ").into_bytes();
 
+
     match vfs::node_from_local_path(&console::get_cdir(), path) {
         Ok(mut n) => {
-
             if n.attributes.get_bit(vfs::ATTR_DIR) {
-                println!("{} is a directory", &a[1]);
+                println!("cannot write to directory");
                 return;
             }
-
             match n.open() {
                 Ok(()) => {},
                 Err(e) => {
