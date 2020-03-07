@@ -25,7 +25,7 @@ info block: (block 0 reserved)
         u64           bytes per block
         u64           final entry
 
-file entry: (256 bytes)
+file entry:
         DATA          data signature
         [char; 128]   name
         u64           parent id
@@ -41,7 +41,7 @@ file entry: (256 bytes)
         u64           sector location of self
         RESERVED
 
-data sector: (512 bytes)
+data block:
         DATA          data signature
         u64           next sector location
         [u8; 500]     file data

@@ -331,6 +331,11 @@ pub fn cd_fn(args: Vec<String>) {
 
     match vfs::node_from_local_path(&console::get_cdir(), args[1].clone()) {
         Ok(n) => {
+            if !n.attributes.get_bit(vfs::ATTR_DIR) {
+                println!("path must be a directory");
+                return;
+            }
+
             console::set_cdir(n);
             return;
         },

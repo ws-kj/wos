@@ -1,6 +1,7 @@
 //WFS: A shit filesystem
 //Spec can be found at ../wfs_spec.txt
 
+use crate::struct_tools;
 use crate::timer;
 use crate::vga_buffer;
 use crate::vfs;
@@ -36,10 +37,10 @@ pub struct InfoBlock {
 }
 
 #[derive(Clone, Copy)]
-#[repr(C)]
+#[repr(C, packed)]
 pub struct FileEntry {
     signature: [u8; 4],
-    name: [char; 128],
+    name: [char; 64],
     parent_id: u64,
     id: u64,
     attributes: u8,
@@ -56,7 +57,7 @@ impl Default for FileEntry {
     fn default() -> FileEntry {
         FileEntry {
             signature: [0; 4],
-            name: [' '; 128],
+            name: [' '; 64],
             parent_id: 0,
             id: 0,
             attributes: 0,
@@ -320,25 +321,40 @@ pub fn get_children(parent_id: u64, name: String, dev_id: usize) -> Result<Vec<v
 }
 
 pub fn get_parent(id: u64, dev_id: usize) -> Result<vfs::FsNode, vfs::Error> {
-    let mut e = find_entry(id)?;
-
-    if e.id != 1 {
+    if id != 1 {
+        let mut e = find_entry(id)?;
+        println!("ASDF");
         e = find_entry(e.parent_id)?;
+        let node = vfs::FsNode {
+            name: e.name, 
+            device: dev_id,
+            parent_id: e.parent_id,
+            id: e.id,
+            attributes: e.attributes,
+            t_creation: e.t_creation,
+            t_edit: e.t_edit,
+            owner: e.owner,
+            size: e.size,
+            open: false,
+        };
+        return Ok(node);
+    } else {
+        let e = find_entry(id)?;
+        let node = vfs::FsNode {
+            name: e.name, 
+            device: dev_id,
+            parent_id: e.parent_id,
+            id: e.id,
+            attributes: e.attributes,
+            t_creation: e.t_creation,
+            t_edit: e.t_edit,
+            owner: e.owner,
+            size: e.size,
+            open: false,
+        };
+        return Ok(node);
     }
 
-    let node = vfs::FsNode {
-        name: e.name, 
-        device: dev_id,
-        parent_id: e.parent_id,
-        id: e.id,
-        attributes: e.attributes,
-        t_creation: e.t_creation,
-        t_edit: e.t_edit,
-        owner: e.owner,
-        size: e.size,
-        open: false,
-    };
-    return Ok(node);
 }
 
 //WFS specific functions
@@ -780,7 +796,7 @@ fn find_empty_blocks(n: usize) -> Vec<usize> {
 
 fn sector_from_entry(f: FileEntry) -> [u8; 512] {
     let mut res: [u8; 512] = [0; 512];
-    let mut i = 0;
+    /*let mut i = 0;
     for b in f.signature.iter() {
         res[i] = *b;
         i += 1;
@@ -828,12 +844,20 @@ fn sector_from_entry(f: FileEntry) -> [u8; 512] {
     for b in &f.location.to_le_bytes() {
         res[i] = *b;
         i += 1;
+    }*/
+
+    unsafe {
+        let slice = struct_tools::to_slice(&f);
+        for i in 0..slice.len() {
+            res[i] = slice[i];
+        }
+
+        return res;
     }
-    return res;
 }
 
 fn entry_from_sector(sec: [u8; 512]) -> FileEntry {
-    let res = FileEntry {
+    /*let res = FileEntry {
         signature: sec[0..4].try_into().expect("sig"),
         name: name_from_slice(&sec[4..132]),
         parent_id: u64::from_le_bytes(sec[132..140].try_into().expect("pid")),
@@ -847,7 +871,12 @@ fn entry_from_sector(sec: [u8; 512]) -> FileEntry {
         next_entry: u64::from_le_bytes(sec[182..190].try_into().expect("ne")),
         prev_entry: u64::from_le_bytes(sec[190..198].try_into().expect("pe")),
         location: u64::from_le_bytes(sec[198..206].try_into().expect("l")),
-    };
+    };*/
+
+    let buf = &sec;
+    let ptr: *const FileEntry = unsafe { mem::transmute(buf.as_ptr()) };
+    let res: FileEntry = unsafe { *ptr };
+
     return res;
 }
 
@@ -881,11 +910,11 @@ fn update_info() {
     ata::pio28_write(ata::ATA_HANDLER.lock().master, 0, 1, info);
 }
 
-fn name_from_slice(slice: &[u8]) -> [char; 128] {
-    let mut res: [char; 128] = [' '; 128];
+fn name_from_slice(slice: &[u8]) -> [char; 64] {
+    let mut res: [char; 64] = [' '; 64];
     let mut i = 0;
     for b in slice {
-        if i >= 128 || *b as char == ' ' { break; }
+        if i >= 64 || *b as char == ' ' { break; }
         res[i] = *b as char;
         i += 1;
     }

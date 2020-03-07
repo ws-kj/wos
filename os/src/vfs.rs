@@ -33,7 +33,7 @@ pub enum System {
 }
 
 pub struct Device {
-    pub name: [char; 128],
+    pub name: [char; 64],
     pub system: System,
     pub index: usize,
     pub opened: Vec<u64>,
@@ -43,7 +43,7 @@ pub struct Device {
 #[repr(C)]
 pub struct FsNode {
     pub open: bool,
-    pub name:   [char; 128],
+    pub name:   [char; 64],
     pub device: usize,
     pub parent_id: u64,
     pub id: u64,
@@ -336,22 +336,22 @@ pub fn node_from_path(path: String) -> Result<FsNode, Error> {
     return Err(Error::FileNotFound);
 }
 
-pub fn nfs(name: String) -> [char; 128] {
+pub fn nfs(name: String) -> [char; 64] {
     filename_from_slice(name.as_bytes())
 }
 
-pub fn filename_from_slice(slice: &[u8]) -> [char; 128] {
-    let mut res: [char; 128] = [' '; 128];
+pub fn filename_from_slice(slice: &[u8]) -> [char; 64] {
+    let mut res: [char; 64] = [' '; 64];
     let mut i = 0;
     for b in slice {
-        if i >= 128 || *b as char == ' ' { break; }
+        if i >= 64 || *b as char == ' ' { break; }
         res[i] = *b as char;
         i += 1;
     }
     return res;
 }
 
-pub fn sfn(filename: [char; 128]) -> String {
+pub fn sfn(filename: [char; 64]) -> String {
     let mut res = String::from("");
     for c in filename.iter() {
         if *c == ' ' { break; }

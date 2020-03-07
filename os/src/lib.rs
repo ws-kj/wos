@@ -36,6 +36,7 @@ pub mod timer;
 pub mod pic;
 pub mod drivers;
 pub mod wfs;
+pub mod struct_tools;
 
 #[global_allocator]
 static ALLOCATOR: allocator::Locked<allocator::bump::BumpAllocator> = allocator::Locked::new(allocator::bump::BumpAllocator::new());
